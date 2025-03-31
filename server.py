@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
-from eva_llama_backend.eva_llama_14 import EvaAssistant
+from eva_llama_14 import EvaAssistant
+
 
 app = Flask(__name__)
 eva = EvaAssistant()
