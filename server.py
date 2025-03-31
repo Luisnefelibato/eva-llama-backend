@@ -20,4 +20,7 @@ def home():
     return "Asistente EVA está corriendo con Render 🚀"
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    import os
+    port = int(os.environ.get("PORT", 8000))  # lee el puerto que Render envía
+    app.run(host="0.0.0.0", port=port)
+
