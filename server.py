@@ -1,26 +1,26 @@
 from flask import Flask, request, jsonify
-from eva_llama_14 import EvaAssistant
-
+from flask_cors import CORS  # 👈 Importa CORS
+from eva_llama_14 import EVA
 
 app = Flask(__name__)
-eva = EvaAssistant()
+CORS(app)  # 👈 Habilita CORS para TODAS las rutas
 
-@app.route("/chat", methods=["POST"])
+assistant = EVA()
+
+@app.route('/chat', methods=['POST'])
 def chat():
     data = request.get_json()
-    message = data.get("message", "")
-    if not message:
-        return jsonify({"error": "Falta el mensaje"}), 400
+    user_message = data.get('message', '')
 
-    response = eva.ollama_client.generate_response(message)
-    return jsonify({"response": response})
+    if not user_message:
+        return jsonify({'response': 'No se recibió ningún mensaje.'}), 400
 
-@app.route("/", methods=["GET"])
-def home():
-    return "Asistente EVA está corriendo con Render 🚀"
+    response = assistant.chat(user_message)
+    if not response:
+        response = "Lo siento, no tengo una respuesta en este momento."
 
-if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 8000))  # lee el puerto que Render envía
-    app.run(host="0.0.0.0", port=port)
+    return jsonify({'response': response})
+
+if __name__ == '__main__':
+    app.run(debug=True)
 
