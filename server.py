@@ -1,11 +1,11 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS  # 👈 Importa CORS
-from eva_llama_14 import EVA
+from eva_llama_14 import EvaAssistant
 
 app = Flask(__name__)
 CORS(app)  # 👈 Habilita CORS para TODAS las rutas
 
-assistant = EVA()
+assistant = EvaAssistant()
 
 @app.route('/chat', methods=['POST'])
 def chat():
