@@ -987,7 +987,12 @@ class OllamaClient:
                 print(f"[DEBUG] Enviando solicitud a Ollama → {self.api_url}")
             print(f"[DEBUG] Payload: {payload}")
 
-            response = requests.post(self.api_url, json=payload)
+            headers = {
+     "Content-Type": "application/json",
+    "User-Agent": "Mozilla/5.0"  # Simula navegador para evitar 403
+}
+            response = requests.post(self.api_url, json=payload, headers=headers)
+
 
             if response.status_code == 200:
                 res_json = response.json()
