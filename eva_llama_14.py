@@ -975,63 +975,37 @@ class OllamaClient:
             return False
     
     def generate_response(self, prompt: str, max_tokens: int = 800) -> str:
-        """
-        Genera una respuesta a través de Ollama utilizando el modelo especificado.
-        
-        Args:
-            prompt: Texto de entrada para generar la respuesta
-            max_tokens: Máximo número de tokens a generar
-            
-        Returns:
-            Respuesta generada por el modelo
-        """
         try:
-            # Preparar la solicitud para Ollama
             payload = {
-                "model": self.model_name,
-                "prompt": prompt,
-                "stream": True,
-                "max_tokens": max_tokens
-            }
-            
-            # Realizar solicitud a Ollama con streaming para evitar timeouts
+            "model": self.model_name,
+            "prompt": prompt,
+            "stream": False,  # Cambiado a False para debug
+            "max_tokens": max_tokens
+        }
+
             if CONFIG["debug"]:
-                print(f"Enviando solicitud a Ollama (modelo: {self.model_name})")
-            
-            response = requests.post(self.api_url, json=payload, stream=True)
-            
+                print(f"[DEBUG] Enviando solicitud a Ollama → {self.api_url}")
+                print(f"[DEBUG] Payload: {payload}")
+
+            response = requests.post(self.api_url, json=payload)
+
             if response.status_code == 200:
-                # Recopilar la respuesta por fragmentos
-                full_response = ""
-                for chunk in response.iter_lines(decode_unicode=True):
-                    if chunk:
-                        try:
-                            # Cada línea es un JSON independiente
-                            chunk_data = json.loads(chunk)
-                            if "response" in chunk_data:
-                                # Añadir el fragmento a la respuesta
-                                fragment = chunk_data["response"]
-                                full_response += fragment
-                            
-                            # Verificar si es el final
-                            if chunk_data.get("done", False):
-                                break
-                        except:
-                            # Ignorar líneas no JSON
-                            continue
-                
-                if CONFIG["debug"]:
-                    print(f"Respuesta de Ollama: {len(full_response)} caracteres")
-                
-                return full_response.strip()
+                res_json = response.json()
+            full_response = res_json.get("response", "").strip()
+
+            if CONFIG["debug"]:
+                print(f"[DEBUG] Respuesta de Ollama: {full_response}")
+
+                return full_response
             else:
                 if CONFIG["debug"]:
-                    print(f"Error en la respuesta de Ollama: {response.status_code}")
-                return ""
+                    print(f"[ERROR] Ollama devolvió código: {response.status_code}")
+                    print(response.text)
+            return ""
         except Exception as e:
             if CONFIG["debug"]:
-                print(f"Error al generar respuesta con Ollama: {str(e)}")
-            return ""
+                print(f"[ERROR] al generar respuesta con Ollama: {str(e)}")
+        return ""
 
 class SentimentAnalyzer:
     """Analizador de sentimiento para personalizar respuestas según el tono del usuario."""
