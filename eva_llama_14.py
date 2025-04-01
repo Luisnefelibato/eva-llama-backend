@@ -80,7 +80,7 @@ CONFIG = {
     ],
     "debug": True,
     "ollama_model": "llama3",
-    "ollama_api_url": "https://pretty-symbols-tell.loca.lt/api/generate"
+    "ollama_api_url": "https://ollama-eva.onrender.com/api/generate"
 ,
     "max_response_length": 1500,  # Límite de caracteres para respuestas técnicas
     "short_response_length": 600,  # Límite para respuestas simples
