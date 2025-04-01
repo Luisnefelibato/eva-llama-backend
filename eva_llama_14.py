@@ -979,33 +979,36 @@ class OllamaClient:
             payload = {
             "model": self.model_name,
             "prompt": prompt,
-            "stream": False,  # Cambiado a False para debug
+            "stream": False,
             "max_tokens": max_tokens
         }
 
             if CONFIG["debug"]:
                 print(f"[DEBUG] Enviando solicitud a Ollama → {self.api_url}")
-                print(f"[DEBUG] Payload: {payload}")
+            print(f"[DEBUG] Payload: {payload}")
 
             response = requests.post(self.api_url, json=payload)
 
             if response.status_code == 200:
                 res_json = response.json()
-            full_response = res_json.get("response", "").strip()
+                full_response = res_json.get("response", "").strip()
 
-            if CONFIG["debug"]:
-                print(f"[DEBUG] Respuesta de Ollama: {full_response}")
+                if CONFIG["debug"]:
+                    print(f"[DEBUG] Respuesta de Ollama: {full_response}")
 
-                return full_response
+                return full_response  # ✅ Esto debe ir FUERA del if debug
+
             else:
                 if CONFIG["debug"]:
                     print(f"[ERROR] Ollama devolvió código: {response.status_code}")
-                    print(response.text)
-            return ""
+                print(response.text)
+                return ""  # Si no fue 200, devolvemos vacío
+
         except Exception as e:
             if CONFIG["debug"]:
                 print(f"[ERROR] al generar respuesta con Ollama: {str(e)}")
-        return ""
+            return ""
+
 
 class SentimentAnalyzer:
     """Analizador de sentimiento para personalizar respuestas según el tono del usuario."""
