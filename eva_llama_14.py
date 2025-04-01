@@ -80,7 +80,7 @@ CONFIG = {
     ],
     "debug": False,
     "ollama_model": "llama3",
-    "ollama_api_url": "https://9066-190-66-208-90.ngrok-free.app/api/generate"
+    "ollama_api_url": "https://ab7c-190-66-208-90.ngrok-free.app/api/generate"
 ,
     "max_response_length": 1500,  # Límite de caracteres para respuestas técnicas
     "short_response_length": 600,  # Límite para respuestas simples
