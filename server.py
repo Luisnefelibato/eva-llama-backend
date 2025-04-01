@@ -1,26 +1,41 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS  # 👈 Importa CORS
+from flask_cors import CORS
 from eva_llama_14 import EvaAssistant
 
 app = Flask(__name__)
-CORS(app)  # 👈 Habilita CORS para TODAS las rutas
+CORS(app)  # Habilita CORS para todas las rutas
 
+# Instancia del asistente
 assistant = EvaAssistant()
 
-@app.route('/chat', methods=['POST'])
+@app.route("/", methods=["GET"])
+def home():
+    return "EVA está corriendo en Render 🚀"
+
+@app.route("/chat", methods=["POST"])
 def chat():
-    data = request.get_json()
-    user_message = data.get('message', '')
+    try:
+        data = request.get_json()
 
-    if not user_message:
-        return jsonify({'response': 'No se recibió ningún mensaje.'}), 400
+        if not data or "message" not in data:
+            return jsonify({"error": "Falta el campo 'message' en el JSON."}), 400
 
-    response = assistant.chat(user_message)
-    if not response:
-        response = "Lo siento, no tengo una respuesta en este momento."
+        user_message = data["message"]
 
-    return jsonify({'response': response})
+        # Generar respuesta con Ollama
+        response = assistant.ollama_client.generate_response(user_message)
 
-if __name__ == '__main__':
-    app.run(debug=True)
+        if not response:
+            response = "Lo siento, no tengo una respuesta en este momento."
 
+        return jsonify({
+            "message": user_message,
+            "response": response
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
