@@ -78,7 +78,7 @@ CONFIG = {
         "Preparando una respuesta personalizada...",
         "Consultando nuestra base de conocimiento..."
     ],
-    "debug": False,
+    "debug": True,
     "ollama_model": "llama3",
     "ollama_api_url": "https://ab7c-190-66-208-90.ngrok-free.app/api/generate"
 ,
