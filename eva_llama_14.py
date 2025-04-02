@@ -937,16 +937,17 @@ class GoogleCalendarIntegration:
 class OllamaClient:
     """Cliente para comunicarse con la API de Ollama."""
     
-    def __init__(self, model_name="llama3", api_url="http://localhost:11434/api/generate"):
+    def __init__(self, model_name="llama3", api_url="https://ollama-eva.onrender.com/api/generate"):
         """
         Inicializa el cliente de Ollama.
         
         Args:
             model_name: llama3
-            api_url:"http://localhost:11434/api/generate"
+            api_url:"https://ollama-eva.onrender.com/api/generate"
         """
         self.model_name = model_name
-        self.api_url = api_url
+        self.api_url = "https://ollama-eva.onrender.com/api/generate"
+
         self.check_connection()
     
     def check_connection(self) -> bool:
