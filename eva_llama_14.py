@@ -82,7 +82,7 @@ CONFIG = {
     "ollama_model": "llama3",
     "ollama_api_url": "https://huge-ads-smile.loca.lt/api/generate"
 ,
-    "max_response_length": 600,  # Límite de caracteres para respuestas técnicas
+    "max_response_length": 400,  # Límite de caracteres para respuestas técnicas
     "short_response_length": 300,  # Límite para respuestas simples
     
     # Expresiones cálidas para variar el tono
@@ -990,7 +990,7 @@ class OllamaClient:
             "model": "llama3",
             "prompt": mensaje_con_contexto,
             "stream": False,
-            "max_tokens": max_tokens
+            "max_tokens": 400
         }
 
             if CONFIG["debug"]:
