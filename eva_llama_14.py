@@ -82,8 +82,8 @@ CONFIG = {
     "ollama_model": "llama3",
     "ollama_api_url": "https://huge-ads-smile.loca.lt/api/generate"
 ,
-    "max_response_length": 1500,  # Límite de caracteres para respuestas técnicas
-    "short_response_length": 600,  # Límite para respuestas simples
+    "max_response_length": 800,  # Límite de caracteres para respuestas técnicas
+    "short_response_length": 300,  # Límite para respuestas simples
     
     # Expresiones cálidas para variar el tono
     "warm_expressions": [
@@ -937,16 +937,16 @@ class GoogleCalendarIntegration:
 class OllamaClient:
     """Cliente para comunicarse con la API de Ollama."""
     
-    def __init__(self, model_name="llama3", api_url="https://huge-ads-smile.loca.lt/api/generate"):
+    def __init__(self, model_name="llama3", api_url="hhttps://eva-llama-backend.onrender.com/api/generate"):
         """
         Inicializa el cliente de Ollama.
         
         Args:
             model_name: llama3
-            api_url:"https://huge-ads-smile.loca.lt/api/generate"
+            api_url:"https://eva-llama-backend.onrender.com/api/generate"
         """
         self.model_name = model_name
-        self.api_url = "https://huge-ads-smile.loca.lt/api/generate"
+        self.api_url = "https://eva-llama-backend.onrender.com/api/generate"
 
         self.check_connection()
     
