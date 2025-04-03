@@ -14,12 +14,26 @@ eva_instances = {}
 # Función para guardar conversaciones en PostgreSQL
 def guardar_en_postgres(rol, mensaje):
     try:
-        from db import guardar_conversacion
-        guardar_conversacion(rol, mensaje)
+        conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS conversaciones (
+                id SERIAL PRIMARY KEY,
+                rol TEXT,
+                mensaje TEXT,
+                fecha TIMESTAMPTZ DEFAULT NOW()
+            );
+        """)
+        cur.execute("INSERT INTO conversaciones (rol, mensaje) VALUES (%s, %s)", (rol, mensaje))
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"[DB] Guardado en PostgreSQL: {rol} → {mensaje}")
         return True
     except Exception as e:
         print(f"[ERROR DB] {e}")
         return False
+
 
 @app.route("/", methods=["GET"])
 def home():
