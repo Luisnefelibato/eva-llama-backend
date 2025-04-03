@@ -80,7 +80,7 @@ CONFIG = {
     ],
     "debug": True,
     "ollama_model": "llama3",
-    "ollama_api_url": "https://huge-ads-smile.loca.lt/api/generate"
+    "ollama_api_url": "https://solid-ants-peel.loca.lt/api/generate"
 ,
     "max_response_length": 400,  # Límite de caracteres para respuestas técnicas
     "short_response_length": 300,  # Límite para respuestas simples
