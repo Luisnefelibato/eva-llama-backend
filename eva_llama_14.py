@@ -978,23 +978,31 @@ class OllamaClient:
     
     def generate_response(self, prompt: str, max_tokens: int = 800) -> str:
         try:
+            mensaje_con_contexto = f"""
+            Eres EVA, una asistente conversacional inteligente y amable. 
+            Siempre te presentas como EVA y ayudas con respuestas claras y útiles.
+
+            Usuario: {prompt}
+            EVA:
+            """
+
             payload = {
-            "model": self.model_name,
-            "prompt": prompt,
+            "model": "llama3",
+            "prompt": mensaje_con_contexto,
             "stream": False,
             "max_tokens": max_tokens
         }
 
             if CONFIG["debug"]:
                 print(f"[DEBUG] Enviando solicitud a Ollama → {self.api_url}")
-            print(f"[DEBUG] Payload: {payload}")
+                print(f"[DEBUG] Payload: {payload}")
 
             headers = {
-     "Content-Type": "application/json",
-    "User-Agent": "Mozilla/5.0"  # Simula navegador para evitar 403
-}
-            response = requests.post(self.api_url, json=payload, headers=headers)
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0"  # Simula navegador para evitar 403
+            }
 
+            response = requests.post(self.api_url, json=payload, headers=headers)
 
             if response.status_code == 200:
                 res_json = response.json()
@@ -1003,19 +1011,18 @@ class OllamaClient:
                 if CONFIG["debug"]:
                     print(f"[DEBUG] Respuesta de Ollama: {full_response}")
 
-                return full_response  # ✅ Esto debe ir FUERA del if debug
+                    return full_response
 
             else:
                 if CONFIG["debug"]:
                     print(f"[ERROR] Ollama devolvió código: {response.status_code}")
-                print(response.text)
-                return ""  # Si no fue 200, devolvemos vacío
+                    print(response.text)
+                    return ""
 
         except Exception as e:
             if CONFIG["debug"]:
                 print(f"[ERROR] al generar respuesta con Ollama: {str(e)}")
-            return ""
-
+                return ""
 
 class SentimentAnalyzer:
     """Analizador de sentimiento para personalizar respuestas según el tono del usuario."""
