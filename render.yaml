@@ -5,7 +5,8 @@ services:
     region: oregon
     plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python server.py"
+    startCommand: gunicorn server:app --bind=0.0.0.0:$PORT --timeout 120
     envVars:
       - key: PORT
         value: 8000
+
