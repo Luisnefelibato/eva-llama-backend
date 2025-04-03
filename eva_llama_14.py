@@ -937,7 +937,7 @@ class GoogleCalendarIntegration:
 class OllamaClient:
     """Cliente para comunicarse con la API de Ollama."""
     
-    def __init__(self, model_name="llama3", api_url="hhttps://eva-llama-backend.onrender.com/api/generate"):
+    def __init__(self, model_name="llama3", api_url="https://eva-llama-backend.onrender.com/api/generate"):
         """
         Inicializa el cliente de Ollama.
         
