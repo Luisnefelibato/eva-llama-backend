@@ -80,7 +80,7 @@ CONFIG = {
     ],
     "debug": True,
     "ollama_model": "llama3",
-    "ollama_api_url": "https://fifty-nails-appear.loca.lt/api/generate"
+    "ollama_api_url": "https://mighty-brooms-invite.loca.lt/api/generate"
 ,
     "max_response_length": 1500,  # Límite de caracteres para respuestas técnicas
     "short_response_length": 600,  # Límite para respuestas simples
@@ -937,16 +937,16 @@ class GoogleCalendarIntegration:
 class OllamaClient:
     """Cliente para comunicarse con la API de Ollama."""
     
-    def __init__(self, model_name="llama3", api_url="https://fifty-nails-appear.loca.lt/api/generate"):
+    def __init__(self, model_name="llama3", api_url="https://mighty-brooms-invite.loca.lt/api/generate"):
         """
         Inicializa el cliente de Ollama.
         
         Args:
             model_name: llama3
-            api_url:"https://fifty-nails-appear.loca.lt/api/generate"
+            api_url:"https://mighty-brooms-invite.loca.lt/api/generate"
         """
         self.model_name = model_name
-        self.api_url = "https://fifty-nails-appear.loca.lt/api/generate"
+        self.api_url = "https://mighty-brooms-invite.loca.lt/api/generate"
 
         self.check_connection()
     
