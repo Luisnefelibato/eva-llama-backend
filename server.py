@@ -46,10 +46,13 @@ def extraer_info_usuario(mensaje):
     """Extrae información relevante del usuario del mensaje"""
     info = {}
     
-    # Extraer nombre
+    # Extraer nombre - evitar extraer "Eva" como nombre del cliente
     nombre_match = re.search(r'(?:me llamo|soy|mi nombre es) ([A-Za-záéíóúÁÉÍÓÚñÑ]+)', mensaje.lower())
     if nombre_match:
-        info['nombre'] = nombre_match.group(1).strip().capitalize()
+        nombre = nombre_match.group(1).strip().capitalize()
+        # Verificar que no sea "Eva" para evitar confusiones
+        if nombre.lower() != "eva":
+            info['nombre'] = nombre
     
     # Detectar servicio de interés
     if any(s in mensaje.lower() for s in ["landing page", "landing"]):
@@ -62,13 +65,8 @@ def extraer_info_usuario(mensaje):
         info['servicio'] = "app"
     elif any(s in mensaje.lower() for s in ["marca", "logo", "branding"]):
         info['servicio'] = "branding"
-    elif any(s in mensaje.lower() for s in ["automatizar", "automatización", "proceso"]):
+    elif any(s in mensaje.lower() for s in ["automatizar", "automatización", "proceso", "negocio"]):
         info['servicio'] = "automatizacion"
-    
-    # Detectar negocio/producto
-    negocio_match = re.search(r'(?:para|de|sobre) (?:mi|una|un) (?:negocio|empresa|tienda|sitio) (?:de|llamad[oa]|sobre) ([a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+)(?:\.|\,|\s|$)', mensaje.lower())
-    if negocio_match:
-        info['negocio'] = negocio_match.group(1).strip()
     
     # Detectar intenciones
     if any(s in mensaje.lower() for s in ["precio", "cuanto", "cuánto", "cotizar", "costo", "vale"]):
@@ -76,47 +74,9 @@ def extraer_info_usuario(mensaje):
     
     return info
 
-def construir_contexto(session_id, nuevo_mensaje):
-    """Construye el contexto para enriquecer el mensaje enviado a Eva"""
-    if session_id not in user_sessions:
-        # Inicializar sesión
-        user_sessions[session_id] = {}
-    
-    # Extraer nueva información del mensaje
-    nueva_info = extraer_info_usuario(nuevo_mensaje)
-    
-    # Actualizar sesión con la nueva información
-    for key, value in nueva_info.items():
-        user_sessions[session_id][key] = value
-    
-    # Construir contexto para la respuesta
-    datos_usuario = user_sessions[session_id]
-    contexto = []
-    
-    # Añadir nombre si existe
-    if 'nombre' in datos_usuario:
-        contexto.append(f"El cliente se llama {datos_usuario['nombre']}.")
-    
-    # Añadir servicio si existe
-    if 'servicio' in datos_usuario and datos_usuario['servicio'] in SERVICIOS:
-        servicio = SERVICIOS[datos_usuario['servicio']]
-        contexto.append(f"Está interesado en {servicio['nombre']} ({servicio['precio']}).")
-    
-    # Añadir negocio si existe
-    if 'negocio' in datos_usuario:
-        contexto.append(f"Su negocio es sobre {datos_usuario['negocio']}.")
-    
-    # Añadir otras intenciones relevantes
-    if datos_usuario.get('intencion_precio', False):
-        contexto.append("Está preguntando por precios.")
-    
-    # Devolver el contexto completo o una cadena vacía
-    if contexto:
-        return "[CONTEXTO: " + " ".join(contexto) + "]"
-    return ""
-
 def limpiar_mensaje(mensaje):
-    """Limpia el mensaje de prefijos innecesarios"""
+    """Limpia el mensaje de prefijos innecesarios y estructura de conversación"""
+    # Primero, eliminar prefijos comunes
     prefijos = ["Usuario:", "Asistente:", "Eva:"]
     mensaje_limpio = mensaje
     
@@ -124,7 +84,115 @@ def limpiar_mensaje(mensaje):
         if mensaje_limpio.startswith(prefijo):
             mensaje_limpio = mensaje_limpio[len(prefijo):].strip()
     
+    # Buscar patrones de conversación (Eliminar las líneas anteriores)
+    if "Usuario:" in mensaje_limpio or "Asistente:" in mensaje_limpio:
+        # Obtener solo la última línea o consulta del usuario
+        lineas = re.split(r'\nUsuario:|\nAsistente:|\nEva:', mensaje_limpio)
+        if lineas:
+            # Tomar la última línea relevante que no sea vacía
+            for linea in reversed(lineas):
+                if linea.strip():
+                    mensaje_limpio = linea.strip()
+                    break
+    
+    # Eliminar cualquier [CONTEXTO: ...] existente
+    mensaje_limpio = re.sub(r'\[CONTEXTO:.*?\]', '', mensaje_limpio).strip()
+    
     return mensaje_limpio
+
+def corregir_respuesta(respuesta, session_id):
+    """Corrige problemas comunes en las respuestas generadas"""
+    if session_id not in user_sessions:
+        return respuesta
+    
+    # Obtener datos del usuario
+    datos = user_sessions[session_id]
+    respuesta_corregida = respuesta
+    
+    # 1. Corregir saludo con nombre
+    if datos.get('nombre'):
+        # Reemplazar saludo genérico por saludo personalizado
+        patrones_saludo = [
+            r'^¡?Hola!', 
+            r'^Hola,', 
+            r'^¡?Hola Eva!'
+        ]
+        
+        for patron in patrones_saludo:
+            if re.search(patron, respuesta_corregida):
+                respuesta_corregida = re.sub(patron, f"¡Hola {datos['nombre']}!", respuesta_corregida)
+                break
+    
+    # 2. Verificar que respuesta está bien formada (evitar reorganización de frases)
+    # Buscar puntos que dividen frases
+    frases = re.split(r'(?<=\.) ', respuesta)
+    
+    # Detectar si hay una reorganización (frase final aparece al inicio)
+    if len(frases) > 2:
+        # Verificar si las frases están en orden incorrecto
+        ultima_frase = frases[-1]
+        if "programar una reunión" in ultima_frase or "agendar" in ultima_frase:
+            # La invitación a reunión debería ir al final, no al principio
+            if "programar una reunión" in frases[0] or "agendar" in frases[0]:
+                # Reorganizar frases correctamente
+                frases_reorganizadas = frases[1:] + [frases[0]]
+                respuesta_corregida = ". ".join(frases_reorganizadas)
+    
+    # 3. Asegurar que se menciona precio cuando es relevante
+    if datos.get('intencion_precio') and datos.get('servicio') in SERVICIOS:
+        servicio = SERVICIOS[datos['servicio']]
+        if servicio['precio'] not in respuesta_corregida:
+            # Añadir información de precio al final
+            respuesta_corregida += f" Nuestro servicio de {servicio['nombre']} tiene un precio {servicio['precio']}."
+    
+    # 4. Asegurar que la respuesta mantiene una longitud adecuada
+    if len(respuesta_corregida) > CONFIG["max_response_length"]:
+        # Truncar en el último punto completo antes del límite
+        max_length = CONFIG["max_response_length"]
+        ultimo_punto = respuesta_corregida[:max_length].rfind('.')
+        if ultimo_punto > 0:
+            respuesta_corregida = respuesta_corregida[:ultimo_punto+1]
+    
+    return respuesta_corregida
+
+def crear_prompt_optimizado(mensaje, session_id):
+    """Crea un prompt optimizado con instrucciones claras"""
+    # Inicializar o actualizar sesión
+    if session_id not in user_sessions:
+        user_sessions[session_id] = {}
+    
+    # Actualizar información del usuario
+    info_usuario = extraer_info_usuario(mensaje)
+    user_sessions[session_id].update(info_usuario)
+    
+    # Preparar prompt con instrucciones específicas
+    instrucciones = []
+    
+    # Añadir nombre si existe
+    if user_sessions[session_id].get('nombre'):
+        instrucciones.append(f"El cliente se llama {user_sessions[session_id]['nombre']}. Dirígete a él/ella por su nombre.")
+    
+    # Añadir servicio si existe
+    if user_sessions[session_id].get('servicio') in SERVICIOS:
+        servicio = SERVICIOS[user_sessions[session_id]['servicio']]
+        instrucciones.append(f"Está interesado en {servicio['nombre']} ({servicio['precio']}).")
+    
+    # Añadir intenciones relevantes
+    if user_sessions[session_id].get('intencion_precio'):
+        instrucciones.append(f"Está preguntando por precios. Menciona costos específicos.")
+    
+    # Añadir instrucciones generales
+    instrucciones.append("Identifícate como Eva de Antares Innovate.")
+    instrucciones.append("Sé concisa (máximo 300 caracteres).")
+    instrucciones.append("Mantén un orden lógico en tu respuesta.")
+    
+    # Crear prompt final
+    if instrucciones:
+        prompt_optimizado = f"{mensaje} [INSTRUCCIONES: {'. '.join(instrucciones)}]"
+    else:
+        prompt_optimizado = mensaje
+    
+    return prompt_optimizado
 
 @app.route("/", methods=["GET"])
 def home():
@@ -144,20 +212,6 @@ def chat():
         
         session_id = data.get("sessionId", "default")
         
-        # Construir contexto para el mensaje
-        contexto = construir_contexto(session_id, user_message)
-        
-        # Preparar mensaje enriquecido con contexto
-        mensaje_enriquecido = user_message
-        if contexto:
-            mensaje_enriquecido = f"{user_message} {contexto}"
-        
-        # Ajustar CONFIG según el tipo de mensaje
-        if any(palabra in user_message.lower() for palabra in ["precio", "cotizar", "costo"]):
-            CONFIG["max_response_length"] = 400  # Respuestas más largas para preguntas de precio
-        else:
-            CONFIG["max_response_length"] = 300  # Respuestas estándar para otras preguntas
-        
         # Crear instancia de Eva o recuperar la existente
         if session_id not in eva_instances:
             eva_instances[session_id] = EvaAssistant(typing_simulation=False)
@@ -168,19 +222,25 @@ def chat():
         if len(eva.conversation_history) > 6:
             eva.conversation_history = eva.conversation_history[-6:]
         
-        # Generar respuesta con el mensaje enriquecido
-        response = eva.get_response(mensaje_enriquecido)
+        # Crear prompt optimizado
+        prompt_optimizado = crear_prompt_optimizado(user_message, session_id)
+        
+        # Generar respuesta
+        response = eva.get_response(prompt_optimizado)
+        
+        # Corregir problemas comunes en la respuesta
+        response_corregida = corregir_respuesta(response, session_id)
         
         # Guardar conversación
         try:
             guardar_conversacion("usuario", user_message, session_id)
-            guardar_conversacion("asistente", response, session_id)
+            guardar_conversacion("asistente", response_corregida, session_id)
         except Exception as db_error:
             print(f"[ERROR DB] {db_error}")
 
         return jsonify({
             "message": user_message,
-            "response": response,
+            "response": response_corregida,
             "sessionId": session_id
         })
 
