@@ -11,77 +11,120 @@ CORS(app)
 # Diccionario para mantener instancias por sesión
 eva_instances = {}
 
-# Configuración específica para optimizar la memoria de contexto
-PRECIOS_SERVICIOS = {
-    "web": "desde $3,000 USD",
-    "ecommerce": "desde $5,000 USD",
-    "branding": "desde $2,500 USD",
-    "apps": "desde $8,000 USD",
-    "marketing": "desde $1,500 USD mensual",
-    "automatizacion": "desde $5,000 USD"
-}
-
-def detectar_servicio_requerido(mensaje):
-    """Detecta el servicio que el usuario está solicitando"""
-    mensaje_lower = mensaje.lower()
-    
-    if any(s in mensaje_lower for s in ["pagina web", "página web", "sitio web", "web", "website"]):
-        return "web"
-    elif any(s in mensaje_lower for s in ["tienda", "ecommerce", "e-commerce", "vender"]):
-        return "ecommerce"
-    elif any(s in mensaje_lower for s in ["logo", "marca", "branding", "identidad"]):
-        return "branding"
-    elif any(s in mensaje_lower for s in ["app", "aplicación", "aplicacion", "movil", "móvil"]):
-        return "apps"
-    elif any(s in mensaje_lower for s in ["marketing", "redes", "publicidad", "anuncios"]):
-        return "marketing"
-    elif any(s in mensaje_lower for s in ["automatizar", "proceso", "flujo", "optimizar"]):
-        return "automatizacion"
-    else:
-        return None
-
-def optimizar_instancia_eva(eva, mensaje_actual, session_id):
-    """Optimiza la instancia de Eva para mejorar las respuestas"""
-    
-    # 1. Limitar el historial de conversación a lo esencial
-    if len(eva.conversation_history) > 6:
-        eva.conversation_history = eva.conversation_history[-6:]
-    
-    # 2. Ajustar configuración según el tipo de mensaje
-    servicio = detectar_servicio_requerido(mensaje_actual)
-    
-    if "cotizar" in mensaje_actual.lower() or "precio" in mensaje_actual.lower() or "costo" in mensaje_actual.lower():
-        # El usuario pregunta por precios, ajustar para incluir información comercial
-        CONFIG["max_response_length"] = 350
-        CONFIG["short_response_length"] = 250
-        
-        # Guardar el servicio detectado en la sesión para referencias futuras
-        if session_id not in user_sessions:
-            user_sessions[session_id] = {}
-        user_sessions[session_id]["servicio_interes"] = servicio
-        
-    elif servicio:
-        # El usuario menciona un servicio específico
-        CONFIG["max_response_length"] = 300
-        CONFIG["short_response_length"] = 200
-        
-        # Guardar el servicio detectado en la sesión para referencias futuras
-        if session_id not in user_sessions:
-            user_sessions[session_id] = {}
-        user_sessions[session_id]["servicio_interes"] = servicio
-        
-    else:
-        # Mensajes generales
-        CONFIG["max_response_length"] = 250
-        CONFIG["short_response_length"] = 150
-    
-    # 3. Forzar modo conciso para evitar truncamiento
-    CONFIG["show_typing"] = False
-    
-    return eva
-
 # Almacén simple para datos de usuario por sesión
 user_sessions = {}
+
+# Precios y detalles de servicios para referencias rápidas
+SERVICIOS = {
+    "web": {
+        "nombre": "sitio web profesional",
+        "precio": "desde $3,000 USD"
+    },
+    "landing": {
+        "nombre": "landing page",
+        "precio": "desde $1,800 USD"
+    },
+    "ecommerce": {
+        "nombre": "tienda online",
+        "precio": "desde $5,000 USD"
+    },
+    "branding": {
+        "nombre": "identidad de marca",
+        "precio": "desde $2,500 USD"
+    },
+    "app": {
+        "nombre": "aplicación móvil",
+        "precio": "desde $8,000 USD"
+    },
+    "automatizacion": {
+        "nombre": "automatización de procesos",
+        "precio": "desde $5,000 USD"
+    }
+}
+
+def extraer_info_usuario(mensaje):
+    """Extrae información relevante del usuario del mensaje"""
+    info = {}
+    
+    # Extraer nombre
+    nombre_match = re.search(r'(?:me llamo|soy|mi nombre es) ([A-Za-záéíóúÁÉÍÓÚñÑ]+)', mensaje.lower())
+    if nombre_match:
+        info['nombre'] = nombre_match.group(1).strip().capitalize()
+    
+    # Detectar servicio de interés
+    if any(s in mensaje.lower() for s in ["landing page", "landing"]):
+        info['servicio'] = "landing"
+    elif any(s in mensaje.lower() for s in ["tienda", "ecommerce", "vender"]):
+        info['servicio'] = "ecommerce"
+    elif any(s in mensaje.lower() for s in ["web", "sitio", "página", "pagina"]):
+        info['servicio'] = "web"
+    elif any(s in mensaje.lower() for s in ["app", "aplicación", "aplicacion", "móvil"]):
+        info['servicio'] = "app"
+    elif any(s in mensaje.lower() for s in ["marca", "logo", "branding"]):
+        info['servicio'] = "branding"
+    elif any(s in mensaje.lower() for s in ["automatizar", "automatización", "proceso"]):
+        info['servicio'] = "automatizacion"
+    
+    # Detectar negocio/producto
+    negocio_match = re.search(r'(?:para|de|sobre) (?:mi|una|un) (?:negocio|empresa|tienda|sitio) (?:de|llamad[oa]|sobre) ([a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+)(?:\.|\,|\s|$)', mensaje.lower())
+    if negocio_match:
+        info['negocio'] = negocio_match.group(1).strip()
+    
+    # Detectar intenciones
+    if any(s in mensaje.lower() for s in ["precio", "cuanto", "cuánto", "cotizar", "costo", "vale"]):
+        info['intencion_precio'] = True
+    
+    return info
+
+def construir_contexto(session_id, nuevo_mensaje):
+    """Construye el contexto para enriquecer el mensaje enviado a Eva"""
+    if session_id not in user_sessions:
+        # Inicializar sesión
+        user_sessions[session_id] = {}
+    
+    # Extraer nueva información del mensaje
+    nueva_info = extraer_info_usuario(nuevo_mensaje)
+    
+    # Actualizar sesión con la nueva información
+    for key, value in nueva_info.items():
+        user_sessions[session_id][key] = value
+    
+    # Construir contexto para la respuesta
+    datos_usuario = user_sessions[session_id]
+    contexto = []
+    
+    # Añadir nombre si existe
+    if 'nombre' in datos_usuario:
+        contexto.append(f"El cliente se llama {datos_usuario['nombre']}.")
+    
+    # Añadir servicio si existe
+    if 'servicio' in datos_usuario and datos_usuario['servicio'] in SERVICIOS:
+        servicio = SERVICIOS[datos_usuario['servicio']]
+        contexto.append(f"Está interesado en {servicio['nombre']} ({servicio['precio']}).")
+    
+    # Añadir negocio si existe
+    if 'negocio' in datos_usuario:
+        contexto.append(f"Su negocio es sobre {datos_usuario['negocio']}.")
+    
+    # Añadir otras intenciones relevantes
+    if datos_usuario.get('intencion_precio', False):
+        contexto.append("Está preguntando por precios.")
+    
+    # Devolver el contexto completo o una cadena vacía
+    if contexto:
+        return "[CONTEXTO: " + " ".join(contexto) + "]"
+    return ""
+
+def limpiar_mensaje(mensaje):
+    """Limpia el mensaje de prefijos innecesarios"""
+    prefijos = ["Usuario:", "Asistente:", "Eva:"]
+    mensaje_limpio = mensaje
+    
+    for prefijo in prefijos:
+        if mensaje_limpio.startswith(prefijo):
+            mensaje_limpio = mensaje_limpio[len(prefijo):].strip()
+    
+    return mensaje_limpio
 
 @app.route("/", methods=["GET"])
 def home():
@@ -95,65 +138,38 @@ def chat():
         if not data or "message" not in data:
             return jsonify({"error": "Falta el campo 'message' en el JSON."}), 400
 
-        # Obtener mensaje limpio del usuario
+        # Obtener y limpiar mensaje del usuario
         mensaje_original = data["message"]
-        user_message = mensaje_original
+        user_message = limpiar_mensaje(mensaje_original)
         
-        # Quitar prefijos que puedan causar confusión
-        prefijos = ["Usuario:", "Asistente:", "Eva:"]
-        for prefijo in prefijos:
-            if user_message.startswith(prefijo):
-                user_message = user_message[len(prefijo):].strip()
-                
         session_id = data.get("sessionId", "default")
+        
+        # Construir contexto para el mensaje
+        contexto = construir_contexto(session_id, user_message)
+        
+        # Preparar mensaje enriquecido con contexto
+        mensaje_enriquecido = user_message
+        if contexto:
+            mensaje_enriquecido = f"{user_message} {contexto}"
+        
+        # Ajustar CONFIG según el tipo de mensaje
+        if any(palabra in user_message.lower() for palabra in ["precio", "cotizar", "costo"]):
+            CONFIG["max_response_length"] = 400  # Respuestas más largas para preguntas de precio
+        else:
+            CONFIG["max_response_length"] = 300  # Respuestas estándar para otras preguntas
         
         # Crear instancia de Eva o recuperar la existente
         if session_id not in eva_instances:
             eva_instances[session_id] = EvaAssistant(typing_simulation=False)
-            
-            # Inicializar nueva sesión
-            user_sessions[session_id] = {"servicio_interes": None}
         
         eva = eva_instances[session_id]
         
-        # Optimizar la instancia para mejorar las respuestas y evitar truncamiento
-        eva = optimizar_instancia_eva(eva, user_message, session_id)
+        # Optimizar historial para evitar sobrecarga de tokens
+        if len(eva.conversation_history) > 6:
+            eva.conversation_history = eva.conversation_history[-6:]
         
-        # Modificar prompt si detectamos una solicitud de cotización
-        servicio_interes = user_sessions[session_id].get("servicio_interes")
-        if "cotizar" in user_message.lower() and servicio_interes and servicio_interes in PRECIOS_SERVICIOS:
-            # Preprocesar la solicitud para incluir información de precios
-            precio = PRECIOS_SERVICIOS[servicio_interes]
-            informacion_precio = f"Nuestro servicio de {servicio_interes} tiene un precio {precio}."
-            
-            # Añadir esta información al mensaje
-            user_message = f"{user_message}. [La ejecutiva sabe que: {informacion_precio}]"
-        
-        # Generar respuesta
-        response = eva.get_response(user_message)
-        
-        # Verificar si la respuesta aborda la pregunta específica sobre cotización
-        if "cotizar" in mensaje_original.lower() and servicio_interes:
-            if PRECIOS_SERVICIOS[servicio_interes] not in response:
-                # Si no se mencionó el precio, asegurarnos de incluirlo
-                servicio_nombre = {
-                    "web": "página web",
-                    "ecommerce": "tienda online",
-                    "branding": "identidad de marca",
-                    "apps": "aplicación móvil",
-                    "marketing": "marketing digital",
-                    "automatizacion": "automatización de procesos"
-                }.get(servicio_interes, servicio_interes)
-                
-                if "precio" not in response.lower() and "costo" not in response.lower():
-                    precio_info = f" El precio para una {servicio_nombre} es {PRECIOS_SERVICIOS[servicio_interes]}."
-                    
-                    # Insertar en un buen lugar de la respuesta
-                    punto_insercion = response.rfind('.')
-                    if punto_insercion > len(response) // 2:
-                        response = response[:punto_insercion] + precio_info + response[punto_insercion:]
-                    else:
-                        response += precio_info
+        # Generar respuesta con el mensaje enriquecido
+        response = eva.get_response(mensaje_enriquecido)
         
         # Guardar conversación
         try:

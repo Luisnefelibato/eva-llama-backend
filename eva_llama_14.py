@@ -82,7 +82,7 @@ CONFIG = {
     "ollama_model": "llama3",
     "ollama_api_url": "https://shaggy-bats-help.loca.lt/api/generate"
 ,
-    "max_response_length": 400,  # Límite de caracteres para respuestas técnicas
+    "max_response_length": 600,  # Límite de caracteres para respuestas técnicas
     "short_response_length": 300,  # Límite para respuestas simples
     
     # Expresiones cálidas para variar el tono
@@ -180,20 +180,6 @@ EVA: "Sí, aumenta la confianza. Le enviaré casos de éxito. Para personalizar 
 Usuario: "¡Sí!"
 EVA: "¿Disponible el jueves a las 11 AM?"
 
-# SIMULACIÓN 3 - Sistema de Reservas para Hotel Boutique
-Usuario: "Buen día, ¿hablo con ANTARES? Necesito un sistema para reservas en línea."
-EVA: "¡Buen día! Soy EVA, claro que podemos ayudarle. ¿Actualmente cómo reciben reservas?"
-Usuario: "Por WhatsApp y llamadas… es un caos."
-EVA: "Entiendo. Nuestro sistema integra calendario, pagos y confirmación automática. ¿Tiene sitio web?"
-Usuario: "Sí, pero muy básico."
-EVA: "Podemos vincularlo. ¿Qué métodos de pago quiere aceptar?"
-Usuario: "Tarjetas y PayPal."
-EVA: "Perfecto. ¿Cuántas habitaciones tiene?"
-Usuario: "10."
-EVA: "Para asegurar que el sistema se adapte a sus necesidades, ¿le parece si habla directamente con nuestro líder de desarrollo? Él le explicará los detalles técnicos."
-Usuario: "¡Sí, por favor!"
-EVA: "¿Disponible el viernes a las 9 AM?"
-
 # SIMULACIÓN 4 - Desarrollo de E-commerce para Artesanías
 Usuario: "Hola, ¿es ANTARES? Quiero vender mis artesanías en línea."
 EVA: "¡Hola! Soy EVA. Claro que podemos ayudarle. ¿Ya tiene algún sitio web o empezaría desde cero?"
@@ -218,18 +204,6 @@ EVA: "Trabajamos con tecnología híbrida para reducir costos. ¿Cuántos usuari
 Usuario: "Unos 150."
 EVA: "Perfecto. ¿Le gustaría una demo de una app similar? Puedo coordinarla para el jueves."
 
-# SIMULACIÓN 6 - Ciberseguridad para Clínica Médica
-Usuario: "¡Urgente! Necesito proteger los datos de mis pacientes."
-EVA: "Soy EVA. Tranquilo, hemos trabajado con HIPAA. ¿Han tenido intentos de hackeo?"
-Usuario: "Sí, y nos preocupa el ransomware."
-EVA: "Implementaremos firewall, encriptación y capacitación anti-phishing. ¿Cuántos empleados acceden al sistema?"
-Usuario: "50, entre médicos y administrativos."
-EVA: "¿Almacenan imágenes médicas (Rayos X, etc.)?"
-Usuario: "Sí, en servidores locales."
-EVA: "Migraremos todo a la nube con backups automáticos. ¿Tienen un presupuesto asignado?"
-Usuario: "Sí, pero quiero una auditoría primero."
-EVA: "Perfecto. Nuestro experto en salud puede visitarlos mañana. ¿A qué hora?"
-
 # SIMULACIÓN 7 - Marketing Digital para Restaurante
 Usuario: "¿Hacen publicidad para restaurantes?"
 EVA: "¡Hola! Soy EVA. Sí, nos especializamos en gastronomía. ¿Qué redes sociales usa actualmente?"
@@ -253,7 +227,6 @@ EVA: "Con eso lograremos buen alcance. ¿Comenzamos el lunes con una estrategia 
 # CONTACTO
 Tel: +52 (689) 331 2690
 Email: contacto@antaresinnovate.com
-Web: www.antaresinnovate.com
     """,
     
     "google_credentials_file": "credentials.json",
@@ -978,57 +951,128 @@ class OllamaClient:
     
     def generate_response(self, prompt: str, max_tokens: int = 300) -> str:
         try:
-            mensaje_con_contexto = f"""
+        # Extraer contexto relevante si está disponible
+            contexto = ""
+            if "[CONTEXTO:" in prompt:
+                partes = prompt.split("[CONTEXTO:", 1)
+                if len(partes) > 1 and "]" in partes[1]:
+                    prompt_limpio = partes[0].strip()
+                    contexto = partes[1].split("]", 1)[0].strip()
+                else:
+                    prompt_limpio = prompt
+            else:
+                prompt_limpio = prompt
+            
+        # Instrucciones mejoradas con información de servicios principales
+            instrucciones = f"""
             <INSTRUCCIONES>
             Eres EVA, ejecutiva de ventas de Antares Innovate, una agencia de transformación digital premium.
-            Tu misión es ayudar a personas interesadas en servicios digitales como branding, desarrollo web, apps, automatización o consultoría.
-            Tu tono es cálido, profesional y cercano. Siempre hablas de “nuestro equipo” y propones un próximo paso concreto.
+            Tu misión es CONSEGUIR CLIENTES ofreciendo servicios digitales como:
+            - Desarrollo web: Sitios profesionales desde $3,000 USD
+            - Landing pages: Optimizadas para conversión desde $1,800 USD
+            - Branding: Identidad visual desde $2,500 USD
+            - Apps: Desarrollo de aplicaciones desde $8,000 USD
+            - Automatización: Soluciones de procesos desde $5,000 USD
+        
+            Tu tono es cálido, profesional y DIRECTO. Siempre menciona "nuestro equipo de Antares" 
+            y propón un próximo paso concreto (reunión, llamada, formulario).
+        
+            RECUERDA:
+            - SÉ CONCISA: Respuestas de máximo 350 caracteres
+            - SIEMPRE menciona un precio aproximado si preguntan por cotizaciones
+             - SIEMPRE ofrece agendar una reunión si el cliente muestra interés
+             - NUNCA uses frases genéricas como "estoy aquí para ayudarte"
+            - NUNCA ignores información previa del cliente (nombre, servicio, etc.)
             </INSTRUCCIONES>
-
-            Usuario: {prompt}
-            EVA:
             """
-
-        # ✅ Limitar el tamaño del prompt (Ollama permite ~2048 tokens ≈ ~7000 caracteres)
+        
+        # Información de contexto de la conversación
+            if contexto:
+                instrucciones += f"""
+                <INFORMACIÓN DEL CLIENTE>
+                {contexto}
+                </INFORMACIÓN DEL CLIENTE>
+                """
+            
+        # Armar el mensaje completo
+            mensaje_con_contexto = f"{instrucciones}\n\nUsuario: {prompt_limpio}\nEVA:"
+        
+        # ✅ Limitar el tamaño del prompt (pero asegurando mantener las instrucciones)
             MAX_PROMPT_CHARS = 7000
             if len(mensaje_con_contexto) > MAX_PROMPT_CHARS:
                 if CONFIG["debug"]:
                     print(f"[WARNING] Truncando mensaje (excedía {MAX_PROMPT_CHARS} caracteres)")
-                mensaje_con_contexto = mensaje_con_contexto[-MAX_PROMPT_CHARS:]  # Mantiene lo más reciente
+            
+            # Conservar instrucciones + inicio y final del prompt
+                instrucciones_len = len(instrucciones)
+                espacio_disponible = MAX_PROMPT_CHARS - instrucciones_len - 100  # Buffer para "Usuario:" y "EVA:"
+            
+                if espacio_disponible > 100:  # Asegurar espacio mínimo
+                # Truncar solo la parte del prompt del usuario
+                    prompt_truncado = prompt_limpio
+                    if len(prompt_truncado) > espacio_disponible:
+                    # Tomar el inicio y final del prompt para mantener contexto
+                        mitad = espacio_disponible // 2
+                        prompt_truncado = prompt_limpio[:mitad] + "..." + prompt_limpio[-mitad:]
+                
+                    mensaje_con_contexto = f"{instrucciones}\n\nUsuario: {prompt_truncado}\nEVA:"
+                else:
+                # Último recurso: mantener solo instrucciones básicas
+                    instrucciones_basicas = instrucciones[:MAX_PROMPT_CHARS - 200]
+                    mensaje_con_contexto = f"{instrucciones_basicas}\n\nUsuario: {prompt_limpio[-100:]}\nEVA:"
 
+        # Enviar solicitud a Ollama
             payload = {
             "model": "llama3",
             "prompt": mensaje_con_contexto,
             "stream": False,
-            "max_tokens": max_tokens
+            "max_tokens": max(max_tokens, 300)  # Asegurar al menos 300 tokens
             }
-
+        
             headers = {
             "Content-Type": "application/json",
             "User-Agent": "Mozilla/5.0"
             }
-
+        
             if CONFIG["debug"]:
                 print(f"[DEBUG] Enviando solicitud a Ollama → {self.api_url}")
                 print(f"[DEBUG] Payload: {payload}")
-
+        
             response = requests.post(self.api_url, json=payload, headers=headers)
-
+        
             if response.status_code == 200:
                 full_response = response.json().get("response", "").strip()
-                print(f"[DEBUG] Respuesta original de Ollama: {full_response}")
-
+            
+                if CONFIG["debug"]:
+                    print(f"[DEBUG] Respuesta original de Ollama: {full_response}")
+                
                 if not full_response:
                     print("[Advertencia] Respuesta de Llama3 vacía.")
                     return "Lo siento, no pude generar una respuesta adecuada. ¿Podrías repetir tu mensaje?"
-
-                return full_response
-
+            
+            # Limpiar frases genéricas comunes que no aportan valor
+                frases_eliminar = [
+                "Estoy aquí para ayudarte",
+                "¿En qué más puedo asistirte?",
+                "No dudes en preguntar si tienes más dudas",
+                "Estoy a tu disposición"
+                ]
+            
+                response_final = full_response
+                for frase in frases_eliminar:
+                    if frase.lower() in response_final.lower():
+                        response_final = response_final.replace(frase, "")
+                    
+            # Asegurar que la respuesta no sea muy corta después de la limpieza
+                if len(response_final.strip()) < 50:
+                    return full_response  # Mantener respuesta original
+                
+                return response_final.strip()
             else:
                 print(f"[ERROR] Ollama devolvió código: {response.status_code}")
                 print(response.text)
                 return ""
-
+            
         except Exception as e:
             print(f"[ERROR] al generar respuesta con Ollama: {str(e)}")
             return ""
