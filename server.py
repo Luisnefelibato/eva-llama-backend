@@ -1,38 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from eva_llama_14 import EvaAssistant, CONFIG
-from datetime import datetime
-import os
-import psycopg2
+from db import guardar_conversacion  # ✅ Importar desde db.py
 
 app = Flask(__name__)
 CORS(app)
 
-# Diccionario para mantener instancias EVA por sesión
+# Diccionario de sesiones EVA activas
 eva_instances = {}
-
-# Función para guardar en PostgreSQL
-def guardar_en_postgres(rol, mensaje):
-    try:
-        conn = psycopg2.connect(os.getenv("DATABASE_URL"))
-        cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS conversaciones (
-                id SERIAL PRIMARY KEY,
-                rol TEXT,
-                mensaje TEXT,
-                fecha TIMESTAMPTZ DEFAULT NOW()
-            );
-        """)
-        cur.execute("INSERT INTO conversaciones (rol, mensaje) VALUES (%s, %s)", (rol, mensaje))
-        conn.commit()
-        cur.close()
-        conn.close()
-        print(f"[DB] Guardado en PostgreSQL: {rol} → {mensaje}")
-        return True
-    except Exception as e:
-        print(f"[ERROR DB] {e}")
-        return False
 
 @app.route("/", methods=["GET"])
 def home():
@@ -49,7 +24,7 @@ def chat():
         user_message = data["message"]
         session_id = data.get("sessionId", "default")
 
-        # Crear o recuperar instancia de EVA
+        # Inicializa Eva si no existe para esta sesión
         if session_id not in eva_instances:
             CONFIG["max_response_length"] = 300
             CONFIG["short_response_length"] = 200
@@ -59,13 +34,13 @@ def chat():
         eva = eva_instances[session_id]
         response = eva.get_response(user_message)
 
-        # Si Ollama falla y no hay respuesta
+        # Si Ollama falla completamente
         if not response:
-            response = "Lo siento, en este momento no puedo responder. ¿Podrías intentarlo más tarde o escribirnos a contacto@antaresinnovate.com?"
+            response = "Lo siento, no pude generar una respuesta en este momento. Intenta de nuevo o escríbenos a contacto@antaresinnovate.com"
 
-        # Guardar en base de datos
-        guardar_en_postgres("usuario", user_message)
-        guardar_en_postgres("asistente", response)
+        # Guardar conversación en PostgreSQL
+        guardar_conversacion("usuario", user_message, session_id)
+        guardar_conversacion("asistente", response, session_id)
 
         return jsonify({
             "message": user_message,
@@ -85,6 +60,7 @@ def reiniciar_instancia():
 
         CONFIG["max_response_length"] = 300
         CONFIG["short_response_length"] = 200
+        CONFIG["show_typing"] = False
 
         eva_instances[session_id] = EvaAssistant(typing_simulation=False)
 
@@ -93,5 +69,6 @@ def reiniciar_instancia():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
+    import os
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port)
