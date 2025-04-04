@@ -978,24 +978,24 @@ class OllamaClient:
     
     def generate_response(self, prompt: str, max_tokens: int = 800) -> str:
         try:
-        # Prompt con instrucciones muy específicas para evitar respuestas genéricas
+        # Prompt con instrucciones para ventas y branding
             mensaje_con_contexto = f"""
             <INSTRUCCIONES>
-        Eres EVA, ejecutiva de ventas de Antares Innovate, una agencia de transformación digital premium.
         NUNCA debes usar frases como "Me alegra que hayas decidido confiar en mí" o "Estoy aquí para escucharte".
+        Eres EVA, ejecutiva de ventas de Antares Innovate, una agencia de transformación digital premium.
         SIEMPRE menciónate como "Eva de Antares Innovate" y SIEMPRE ofrece servicios específicos.
         SIEMPRE habla de "nuestro equipo", "nuestros diseñadores", "nuestros desarrolladores".
-        
+
         En cada respuesta DEBES:
         1. Mencionar Antares Innovate por lo menos una vez
         2. Ofrecer un servicio concreto relacionado con su necesidad
         3. Mencionar un beneficio específico de trabajar con nosotros
         4. Incitar a una reunión o próximo paso comercial
-        
+
         Tus respuestas deben ser directas, personales y orientadas a VENTAS.
         Nuestros servicios: branding (desde $2,500 USD), web (desde $3,000 USD), apps ($8,000 USD), automatización ($5,000 USD).
         </INSTRUCCIONES>
-        
+
         <HISTORIAL>
         Usuario anterior: Quiero crear una marca para mi negocio.
         EVA: ¡Genial! En Antares Innovate podemos ayudarte con un servicio completo de branding desde $2,500 USD que incluye logo, colores, tipografía y manual de marca. Nuestros diseñadores han creado identidades para empresas que aumentaron su reconocimiento en un 40%. ¿Te gustaría agendar una videollamada para analizar específicamente tu proyecto?
@@ -1009,60 +1009,22 @@ class OllamaClient:
             "model": "llama3",
             "prompt": mensaje_con_contexto,
             "stream": False,
-            "max_tokens": 400
-            }
+            "max_tokens": max_tokens
+        }
+
+            headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0"  # Para evitar errores 403
+        }
 
             if CONFIG["debug"]:
                 print(f"[DEBUG] Enviando solicitud a Ollama → {self.api_url}")
                 print(f"[DEBUG] Payload: {payload}")
 
-            headers = {
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0"  # Simula navegador para evitar 403
-            }
-
             response = requests.post(self.api_url, json=payload, headers=headers)
 
             if response.status_code == 200:
-                res_json = response.json()
-                full_response = res_json.get("response", "").strip()
-
-            # Verificar si la respuesta cumple con los requisitos mínimos
-                lower_response = full_response.lower()
-            
-            # Si la respuesta no menciona Antares, forzar una respuesta fallback
-                if "antares" not in lower_response:
-                    palabras_clave = ["marca", "branding", "logo", "diseño", "web", "página", "sitio", "app", "aplicación", 
-                                 "marketing", "redes", "automatización", "proceso", "digital"]
-                
-                # Detectar palabras clave en el prompt para personalizar respuesta
-                    tema_detectado = "transformación digital"
-                    for palabra in palabras_clave:
-                        if palabra in prompt.lower():
-                            if palabra in ["marca", "branding", "logo", "diseño"]:
-                                tema_detectado = "branding"
-                            break
-                        elif palabra in ["web", "página", "sitio"]:
-                            tema_detectado = "diseño web"
-                            break
-                        elif palabra in ["app", "aplicación"]:
-                            tema_detectado = "desarrollo de apps"
-                            break
-                        elif palabra in ["marketing", "redes"]:
-                            tema_detectado = "marketing digital"
-                            break
-                        elif palabra in ["automatización", "proceso"]:
-                            tema_detectado = "automatización"
-                            break
-                
-                # Extraer nombre si está en el prompt
-                nombre = None
-                nombre_match = re.search(r'(?:me llamo|soy|mi nombre es)\s+([A-Za-zÁáÉéÍíÓóÚúÑñ]+(?:\s+[A-Za-zÁáÉéÍíÓóÚúÑñ]+)?)', prompt.lower())
-                if nombre_match:
-                    nombre = nombre_match.group(1).strip().capitalize()
-                
-                # Generar respuesta fallback personalizada
-                full_response = self._generar_respuesta_fallback(tema_detectado, nombre)
+                full_response = response.json().get("response", "").strip()
 
                 if CONFIG["debug"]:
                     print(f"[DEBUG] Respuesta de Ollama: {full_response}")
@@ -1070,15 +1032,14 @@ class OllamaClient:
                 return full_response
 
             else:
-                if CONFIG["debug"]:
-                    print(f"[ERROR] Ollama devolvió código: {response.status_code}")
-                    print(response.text)
-                return self._generar_respuesta_fallback("general")
+                print(f"[ERROR] Ollama devolvió código: {response.status_code}")
+                print(response.text)
+            return ""
 
         except Exception as e:
-            if CONFIG["debug"]:
-                print(f"[ERROR] al generar respuesta con Ollama: {str(e)}")
-            return self._generar_respuesta_fallback("general")
+            print(f"[ERROR] al generar respuesta con Ollama: {str(e)}")
+        return ""
+
 
 class SentimentAnalyzer:
     """Analizador de sentimiento para personalizar respuestas según el tono del usuario."""
