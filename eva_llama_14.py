@@ -976,46 +976,30 @@ class OllamaClient:
                 print(f"Error al intentar conectar con Ollama: {str(e)}")
             return False
     
-    def generate_response(self, prompt: str, max_tokens: int = 800) -> str:
+    def generate_response(self, prompt: str, max_tokens: int = 300) -> str:
         try:
-        # Prompt con instrucciones para ventas y branding
             mensaje_con_contexto = f"""
             <INSTRUCCIONES>
-        NUNCA debes usar frases como "Me alegra que hayas decidido confiar en mí" o "Estoy aquí para escucharte".
-        Eres EVA, ejecutiva de ventas de Antares Innovate, una agencia de transformación digital premium.
-        SIEMPRE menciónate como "Eva de Antares Innovate" y SIEMPRE ofrece servicios específicos.
-        SIEMPRE habla de "nuestro equipo", "nuestros diseñadores", "nuestros desarrolladores".
+            Eres EVA, ejecutiva de ventas de Antares Innovate, una agencia de transformación digital premium.
+            Tu misión es ayudar a personas interesadas en servicios digitales como branding, desarrollo web, apps, automatización o consultoría.
+            Tu tono es cálido, profesional y cercano. Siempre hablas de “nuestro equipo” y propones un próximo paso concreto.
+            </INSTRUCCIONES>
 
-        En cada respuesta DEBES:
-        1. Mencionar Antares Innovate por lo menos una vez
-        2. Ofrecer un servicio concreto relacionado con su necesidad
-        3. Mencionar un beneficio específico de trabajar con nosotros
-        4. Incitar a una reunión o próximo paso comercial
-
-        Tus respuestas deben ser directas, personales y orientadas a VENTAS.
-        Nuestros servicios: branding (desde $2,500 USD), web (desde $3,000 USD), apps ($8,000 USD), automatización ($5,000 USD).
-        </INSTRUCCIONES>
-
-        <HISTORIAL>
-        Usuario anterior: Quiero crear una marca para mi negocio.
-        EVA: ¡Genial! En Antares Innovate podemos ayudarte con un servicio completo de branding desde $2,500 USD que incluye logo, colores, tipografía y manual de marca. Nuestros diseñadores han creado identidades para empresas que aumentaron su reconocimiento en un 40%. ¿Te gustaría agendar una videollamada para analizar específicamente tu proyecto?
-        </HISTORIAL>
-
-        Usuario: {prompt}
-        EVA:
-        """
+            Usuario: {prompt}
+            EVA:
+            """
 
             payload = {
             "model": "llama3",
             "prompt": mensaje_con_contexto,
             "stream": False,
             "max_tokens": max_tokens
-        }
+            }
 
             headers = {
             "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0"  # Para evitar errores 403
-        }
+            "User-Agent": "Mozilla/5.0"
+            }
 
             if CONFIG["debug"]:
                 print(f"[DEBUG] Enviando solicitud a Ollama → {self.api_url}")
@@ -1026,8 +1010,12 @@ class OllamaClient:
             if response.status_code == 200:
                 full_response = response.json().get("response", "").strip()
 
-                if CONFIG["debug"]:
-                    print(f"[DEBUG] Respuesta de Ollama: {full_response}")
+                if not full_response or len(full_response) < 40:
+                    print("[Advertencia] Respuesta de Llama3 vacía o muy corta.")
+                return "Lo siento, no pude generar una respuesta adecuada. ¿Podrías repetir tu mensaje?"
+
+            if CONFIG["debug"]:
+                print(f"[DEBUG] Respuesta de Ollama: {full_response}")
 
                 return full_response
 
@@ -1039,6 +1027,7 @@ class OllamaClient:
         except Exception as e:
             print(f"[ERROR] al generar respuesta con Ollama: {str(e)}")
         return ""
+
 
 
 class SentimentAnalyzer:
