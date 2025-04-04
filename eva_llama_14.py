@@ -1010,7 +1010,7 @@ class OllamaClient:
             if response.status_code == 200:
                 full_response = response.json().get("response", "").strip()
 
-                if not full_response or len(full_response) < 40:
+                if not full_response:
                     print("[Advertencia] Respuesta de Llama3 vacía o muy corta.")
                 return "Lo siento, no pude generar una respuesta adecuada. ¿Podrías repetir tu mensaje?"
 
