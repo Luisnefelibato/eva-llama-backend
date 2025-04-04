@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from eva_llama_14 import EvaAssistant, CONFIG
-from db import guardar_conversacion  # Importamos la función existente
+from db import guardar_conversacion
 import os
 import re
 
@@ -11,35 +11,48 @@ CORS(app)
 # Diccionario para mantener instancias por sesión
 eva_instances = {}
 
-def es_pregunta_tecnica(mensaje):
-    """Determina si el mensaje es una pregunta técnica que requiere respuesta detallada"""
-    mensaje_lower = mensaje.lower()
-    
-    # Palabras clave técnicas
-    tecnicas = [
-        "como", "implementar", "desarrollar", "código", "programar", 
-        "automatizar", "integrar", "optimizar", "configurar", "api",
-        "base de datos", "framework", "javascript", "python", "react", 
-        "arquitectura", "tecnología", "servidor", "cloud", "desplegar"
+def limpiar_mensaje(mensaje):
+    """
+    Limpia el mensaje para evitar problemas de formato en conversaciones
+    Elimina prefijos como "Asistente:" o "Usuario:" para evitar confusión
+    """
+    # Patrones comunes que podrían causar confusión
+    patrones = [
+        r'^Asistente:\s*',
+        r'^Eva:\s*',
+        r'^Usuario:\s*',
+        r'Asistente:\s*$',
+        r'Eva:\s*$',
+        r'Usuario:\s*$',
     ]
     
-    # Verificar si tiene palabras técnicas
-    tiene_tecnicas = any(palabra in mensaje_lower for palabra in tecnicas)
+    mensaje_limpio = mensaje
+    for patron in patrones:
+        mensaje_limpio = re.sub(patron, '', mensaje_limpio, flags=re.IGNORECASE)
     
-    # Verificar si es una pregunta compleja (longitud o estructura)
-    es_compleja = len(mensaje.split()) > 10
+    # Si el mensaje contiene una conversación completa, extraer solo la última parte
+    if "Usuario:" in mensaje and "Asistente:" in mensaje:
+        partes = re.split(r'Usuario:|Asistente:', mensaje)
+        if partes:
+            # Tomar la última parte significativa
+            mensaje_limpio = partes[-1].strip()
     
-    return tiene_tecnicas and es_compleja
+    return mensaje_limpio
 
 def ajustar_configuracion_para_mensaje(mensaje):
     """Ajusta la configuración de Eva según el tipo de mensaje"""
-    if es_pregunta_tecnica(mensaje):
-        # Para preguntas técnicas: respuestas más largas y detalladas
-        CONFIG["max_response_length"] = 500
-        CONFIG["short_response_length"] = 350
+    # Detectar si es una pregunta técnica o compleja
+    es_tecnica = any(palabra in mensaje.lower() for palabra in [
+        "como", "implementar", "desarrollar", "código", "programar", 
+        "automatizar", "integrar", "optimizar", "configurar"
+    ])
+    
+    # Ajustar longitud de respuesta según complejidad
+    if es_tecnica or len(mensaje.split()) > 15:
+        CONFIG["max_response_length"] = 400  # Respuestas más largas para preguntas técnicas
+        CONFIG["short_response_length"] = 250
     else:
-        # Para preguntas simples: respuestas concisas
-        CONFIG["max_response_length"] = 250
+        CONFIG["max_response_length"] = 250  # Respuestas más concisas para preguntas simples
         CONFIG["short_response_length"] = 150
 
 def optimizar_historial_conversacion(eva_instance):
@@ -60,9 +73,16 @@ def chat():
         if not data or "message" not in data:
             return jsonify({"error": "Falta el campo 'message' en el JSON."}), 400
 
-        user_message = data["message"]
+        # Limpiar y procesar el mensaje del usuario
+        mensaje_original = data["message"]
+        user_message = limpiar_mensaje(mensaje_original)
+        
+        # Si el mensaje está vacío después de limpiarlo
+        if not user_message.strip():
+            user_message = mensaje_original
+        
         session_id = data.get("sessionId", "default")
-
+        
         # Ajustar configuración según el tipo de mensaje
         ajustar_configuracion_para_mensaje(user_message)
 
@@ -78,7 +98,7 @@ def chat():
         # Generar respuesta usando EvaAssistant
         response = eva.get_response(user_message)
 
-        # Guardar conversación en la base de datos
+        # Guardar conversación
         try:
             guardar_conversacion("usuario", user_message, session_id)
             guardar_conversacion("asistente", response, session_id)
