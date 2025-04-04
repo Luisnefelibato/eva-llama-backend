@@ -977,6 +977,12 @@ class OllamaClient:
             return False
     
     def generate_response(self, prompt: str, max_tokens: int = 300) -> str:
+        # Construir el historial para el prompt
+        historial_contexto = ""
+        if self.historial:
+            for turno in self.historial[-3:]:  # Últimos 3 intercambios
+                historial_contexto += f"Usuario: {turno['user']}\nEVA: {turno['eva']}\n"
+
         try:
             mensaje_con_contexto = f"""
             <INSTRUCCIONES>
@@ -984,7 +990,9 @@ class OllamaClient:
             Tu misión es ayudar a personas interesadas en servicios digitales como branding, desarrollo web, apps, automatización o consultoría.
             Tu tono es cálido, profesional y cercano. Siempre hablas de “nuestro equipo” y propones un próximo paso concreto.
             </INSTRUCCIONES>
-
+            <HISTORIAL>
+            {historial_contexto}
+            </HISTORIAL>
             Usuario: {prompt}
             EVA:
             """
@@ -1014,7 +1022,8 @@ class OllamaClient:
                 if not full_response:
                     print("[Advertencia] Respuesta de Llama3 vacía.")
                     return "Lo siento, no pude generar una respuesta adecuada. ¿Podrías repetir tu mensaje?"
-
+                # ✅ GUARDAR EN HISTORIAL AQUÍ
+                self.historial.append({"user": prompt, "eva": full_response})
                 return full_response  # ✅ Solo se devuelve si es válida
 
             else:
@@ -1114,6 +1123,7 @@ class EvaAssistant:
     """Asistente virtual Eva para Antares Innovate usando Llama3 vía Ollama."""
     
     def __init__(self, typing_simulation: bool = True):
+        self.historial = []
         """Inicializa el asistente virtual."""
         if CONFIG["debug"]:
             print(f"{Colors.YELLOW}[Inicialización] Iniciando Eva con Llama3...{Colors.ENDC}")
@@ -1171,7 +1181,81 @@ class EvaAssistant:
             
         # Inicializar analizador de sentimiento
         self.sentiment_analyzer = SentimentAnalyzer()
+
+    def get_response(self, prompt: str) -> str:
+    # Construye el historial inmediato para contexto
+        historial_contexto = ""
+        if self.historial:
+            for turno in self.historial[-3:]:
+                historial_contexto += f"Usuario: {turno['user']}\nEVA: {turno['eva']}\n"
+
+    # Crea el mensaje con contexto e instrucciones
+        mensaje_con_contexto = f"""
+    <INSTRUCCIONES>
+    Eres EVA, ejecutiva de ventas de Antares Innovate, una agencia de transformación digital premium.
+    Tu misión es ayudar a personas interesadas en servicios como branding, desarrollo web, apps, automatización o consultoría.
+    Tu tono es cálido, profesional y cercano. Siempre hablas de “nuestro equipo” y propones un próximo paso concreto.
+    Evita repetir saludos si ya lo hiciste. No repitas presentaciones.
+    </INSTRUCCIONES>
+
+    <HISTORIAL>
+    {historial_contexto}
+    </HISTORIAL>
+
+    Usuario: {prompt}
+    EVA:
+    """
+
+        respuesta = self.generate_response(mensaje_con_contexto, prompt)
+        return respuesta
     
+    def generate_response(self, mensaje_con_contexto: str, prompt: str, max_tokens: int = 300) -> str:
+        try:
+            payload = {
+            "model": CONFIG.get("ollama_model", "llama3"),
+            "prompt": mensaje_con_contexto,
+            "stream": False,
+            "max_tokens": max_tokens
+            }
+
+            headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0"
+            }
+
+            if CONFIG["debug"]:
+                print(f"[DEBUG] Enviando solicitud a Ollama → {self.ollama_client.api_url}")
+                print(f"[DEBUG] Payload: {payload}")
+
+            response = requests.post(self.ollama_client.api_url, json=payload, headers=headers)
+
+            if response.status_code == 200:
+                full_response = response.json().get("response", "").strip()
+
+                if CONFIG["debug"]:
+                    print(f"[DEBUG] Respuesta original de Ollama: {full_response}")
+
+                    if not full_response:
+                        print("[Advertencia] Respuesta vacía.")
+                    return "Lo siento, no pude generar una respuesta adecuada. ¿Podrías repetir tu mensaje?"
+
+            # Guardar en historial
+                self.historial.append({"user": prompt, "eva": full_response})
+                self.user_info["ultimos_mensajes"].append(prompt)
+                self.message_counter += 1
+
+                return full_response
+
+            else:
+                print(f"[ERROR] Ollama devolvió código: {response.status_code}")
+                print(response.text)
+                return "Lo siento, hubo un problema al generar la respuesta."
+
+        except Exception as e:
+            print(f"[ERROR] al generar respuesta con Ollama: {str(e)}")
+            return "Ocurrió un error inesperado procesando tu mensaje."
+ 
+
     def _classify_intent_and_level(self, message: str) -> Tuple[str, str, int]:
         """
         Clasifica la intención del mensaje, detecta el pilar relacionado
