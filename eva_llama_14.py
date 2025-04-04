@@ -1009,15 +1009,13 @@ class OllamaClient:
 
             if response.status_code == 200:
                 full_response = response.json().get("response", "").strip()
+                print(f"[DEBUG] Respuesta original de Ollama: {full_response}")
 
                 if not full_response:
-                    print("[Advertencia] Respuesta de Llama3 vacía o muy corta.")
-                return "Lo siento, no pude generar una respuesta adecuada. ¿Podrías repetir tu mensaje?"
+                    print("[Advertencia] Respuesta de Llama3 vacía.")
+                    return "Lo siento, no pude generar una respuesta adecuada. ¿Podrías repetir tu mensaje?"
 
-            if CONFIG["debug"]:
-                print(f"[DEBUG] Respuesta de Ollama: {full_response}")
-
-                return full_response
+                return full_response  # ✅ Solo se devuelve si es válida
 
             else:
                 print(f"[ERROR] Ollama devolvió código: {response.status_code}")
@@ -1027,6 +1025,7 @@ class OllamaClient:
         except Exception as e:
             print(f"[ERROR] al generar respuesta con Ollama: {str(e)}")
         return ""
+
 
 
 
