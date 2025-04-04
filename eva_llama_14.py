@@ -1020,11 +1020,11 @@ class OllamaClient:
             else:
                 print(f"[ERROR] Ollama devolvió código: {response.status_code}")
                 print(response.text)
-            return ""
+                return ""
 
         except Exception as e:
             print(f"[ERROR] al generar respuesta con Ollama: {str(e)}")
-        return ""
+            return ""
 
 
 
