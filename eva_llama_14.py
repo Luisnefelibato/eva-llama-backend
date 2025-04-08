@@ -2151,16 +2151,16 @@ class EvaAssistant:
         """Genera una respuesta al mensaje del usuario."""
         if CONFIG["debug"]:
             print(f"\n{Colors.BLUE}[Procesando] Mensaje: '{message}'{Colors.ENDC}")
-    
+
         self.message_counter += 1
         intent, pillar, level = self._classify_intent_and_level(message)
-    
+
         if CONFIG["debug"]:
             print(f"{Colors.BLUE}[Procesando] Intención: {intent}, Pilar: {pillar}, Nivel: {level}{Colors.ENDC}")
-    
+
     # Extraer información del usuario del mensaje
         self._extract_user_info(message)
-    
+
     # Guardar el mensaje en el historial
         self.conversation_history.append({
         "id": self.message_counter,
@@ -2169,100 +2169,80 @@ class EvaAssistant:
         "timestamp": datetime.now().isoformat(),
         "intencion": intent
         })
-    
+
     # Simular tiempo de pensamiento
         simulate_thinking(len(message))
-    
+
     # Manejar solicitudes de reunión si se detecta esa intención
         if intent == "meeting":
             meeting_response, meeting_processed = self._handle_meeting_request(message)
-        
-        # Si se procesó correctamente la reunión, devolver la respuesta
+
             if meeting_processed or "reunión" in meeting_response.lower():
-            # Guardar la respuesta en el historial
                 self.conversation_history.append({
                 "id": self.message_counter,
                 "rol": "asistente", 
                 "contenido": meeting_response,
                 "timestamp": datetime.now().isoformat(),
                 "intencion": intent
-                })
-            
-            # Mostrar respuesta
+            })
+
             if self.typing_simulation:
                 simulate_typing(meeting_response)
             else:
                 print(f"\n{Colors.GREEN}Eva:{Colors.ENDC} {meeting_response}")
-            
+
             return meeting_response
-    
+
+    # Definir is_technical antes del llamado a Ollama
+        is_technical = level >= 4 or (intent in ["consulting", "technology", "creativity"] and level >= 3)
+
     # Construir el prompt para Llama3
-        prompt = self._build_prompt(message, intent, pillar, level)
-    
+        prompt = get_filtered_prompt(message, intent, nivel=level)
+
     # Generar respuesta con Llama3
         llama_response = self.ollama_client.generate_response(prompt)
-    
-    # Si la respuesta de Llama3 está vacía o es demasiado corta, usar respuesta de fallback
+
         if not llama_response or len(llama_response) < 20:
             if CONFIG["debug"]:
                 print(f"{Colors.YELLOW}[Advertencia] Respuesta de Llama3 vacía o muy corta, usando fallback{Colors.ENDC}")
-        
-        # Obtener template de respuesta según intención
-            response_template = get_response_template(intent, level)
-        
-        # Personalizar con nombre si lo tenemos
+
+            fallback_response = get_response_template(intent, nivel=level)
+
             if self.user_info["nombre"]:
-                if "hola" in response_template.lower() or "buen" in response_template.lower():
-                # Para saludos, insertar el nombre después del saludo
-                    response_template = re.sub(r'(¡Como estas!)', f"\\1 {self.user_info['nombre']},", response_template, flags=re.IGNORECASE)
-                else:
-                # Para otras respuestas, añadir al inicio
-                    warm_expression = random.choice(CONFIG["warm_expressions"])
-                    prefix = f"{warm_expression} {self.user_info['nombre']}, "
-                    response_template = prefix + response_template[0].lower() + response_template[1:]
-        
-            response = response_template
-        
-        # Añadir información de contacto si no hay ya
-            if "contacto@antaresinnovate.com" not in response and "www.antaresinnovate.com" not in response:
-                response += random.choice(CONTACT_INFO)
-            else:
-        # Determinar si es una consulta técnica que requiere respuesta detallada
-                is_technical = level >= 4 or intent in ["consulting", "technology", "creativity"] and level >= 3
-        
-        # Longitud máxima según complejidad
-            max_length = CONFIG["max_response_length"] if is_technical else CONFIG["short_response_length"]
-        
-        # Optimizar la respuesta de Llama3
-            response = self._optimize_response(llama_response, max_length, is_technical)
-        
-        # Añadir información de contacto para intenciones específicas
+                warm_expression = random.choice(CONFIG["warm_expressions"])
+                fallback_response = f"{warm_expression} {self.user_info['nombre']}, {fallback_response}"
+
+            response = fallback_response
+
             if intent in ["pricing", "meeting", "contact"] and "contacto@antaresinnovate.com" not in response:
-            # Añadir contacto solo si hay espacio
-                if len(response) + 30 <= max_length:
-                    contact_info = "\n\nContacto: contacto@antaresinnovate.com"
-                    response += contact_info
-    
-    # Guardar la respuesta en el historial
+                if len(response) + 30 <= CONFIG["short_response_length"]:
+                    response += "\n\nContacto: contacto@antaresinnovate.com"
+            else:
+                max_length = CONFIG["max_response_length"] if is_technical else CONFIG["short_response_length"]
+                response = self._optimize_response(llama_response, max_length, is_technical)
+
+                if intent in ["pricing", "meeting", "contact"] and "contacto@antaresinnovate.com" not in response:
+                    if len(response) + 30 <= CONFIG["short_response_length"]:
+                        response += "\n\nContacto: contacto@antaresinnovate.com"
+
         self.conversation_history.append({
         "id": self.message_counter,
         "rol": "asistente", 
         "contenido": response,
         "timestamp": datetime.now().isoformat(),
         "intencion": intent
-    })
-    
+        })
+
         if CONFIG["debug"]:
             print(f"{Colors.GREEN}[Procesando] Respuesta lista ({len(response)} caracteres){Colors.ENDC}")
-    
-    # Mostrar la respuesta al usuario
+
         if self.typing_simulation:
             simulate_typing(response)
         else:
             print(f"\n{Colors.GREEN}Eva:{Colors.ENDC} {response}")
-        
+
         return response
-    
+
     def save_conversation(self, filename: str = "conversacion_eva.json"):
         """Guarda la conversación actual en un archivo JSON."""
         try:
