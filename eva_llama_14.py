@@ -22,12 +22,13 @@ import argparse
 import time
 import re
 import requests
-import time  # Añade esta línea si no existe
 import pytz
-import time
 from datetime import datetime, time as timedelta, date, time as datetime_time
 from typing import Dict, List, Optional, Any, Tuple, Union
 import sqlite3
+
+# Importar configuración y funciones de conocimiento
+from knowledge_fragments import CONFIG, get_filtered_prompt, get_lienzo_tecnico, get_response_template
 
 # Importar la base de conocimiento para fallback si es necesario
 try:
@@ -48,7 +49,7 @@ try:
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
     import base64
-    
+
     GOOGLE_INTEGRATION_AVAILABLE = True
 except ImportError:
     GOOGLE_INTEGRATION_AVAILABLE = False
@@ -65,234 +66,8 @@ class Colors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-# Configuraciones globales
-CONFIG = {
-    "min_response_time": 0.4,
-    "max_response_time": 1.2,
-    "char_typing_speed": 0.01,
-    "show_typing": True,
-    "thinking_messages": [
-        "Analizando tu consulta...", 
-        "Procesando información...", 
-        "Buscando la mejor respuesta para ti...",
-        "Preparando una respuesta personalizada...",
-        "Consultando nuestra base de conocimiento..."
-    ],
-    "debug": True,
-    "ollama_model": "llama3",
-    "ollama_api_url": "https://shaggy-bats-help.loca.lt/api/generate"
-,
-    "max_response_length": 600,  # Límite de caracteres para respuestas técnicas
-    "short_response_length": 300,  # Límite para respuestas simples
-    
-    # Expresiones cálidas para variar el tono
-    "warm_expressions": [
-        "¡Me encanta poder ayudarte con esto!",
-        "Estoy aquí para facilitarte las cosas",
-        "Qué buena pregunta has hecho",
-        "Me alegra que te intereses en nuestros servicios",
-        "Cuenta conmigo para cualquier duda",
-        "Será un placer ayudarte con eso",
-        "¡Excelente elección!",
-        "Trabajemos juntos en esto",
-        "Estoy encantada de poder asistirte",
-        "Confía en que haremos un gran trabajo juntos"
-    ],
-    
-    # Nueva base de conocimiento estructurada en jerarquía informativa
-    "knowledge_base_content": """
-# IDENTIDAD DE MARCA
-Antares Innovate es una agencia de transformación digital creativa. Combinamos creatividad, tecnología y consultoría para ayudar a empresas a escalar en el mundo digital. Operamos en Colombia y USA.
-
-# PILARES PRINCIPALES
-1. Creatividad: Branding, diseño y contenido que conecta con tu audiencia.
-2. Tecnología: Soluciones digitales a medida, desde web hasta apps y chatbots.
-3. Consultoría: Acompañamiento en transformación digital y automatización.
-
-# CREATIVIDAD - SERVICIOS
-• Identidad visual (logos, colores, tipografías)
-• Manuales de marca y Brandbooks
-• Storytelling visual
-• Producción de video y postproducción
-• Motion graphics y animación 2D/3D
-• Ilustraciones, concept art y vectores
-• Generación de contenido con IA
-• Comerciales y audiovisuales de alto impacto
-
-# TECNOLOGÍA - SERVICIOS
-• Diseño UI/UX premiado (Figma, prototipado, pruebas)
-• Desarrollo web (React, Next.js, Tailwind, WordPress)
-• Apps web y móviles
-• Integración con APIs y sistemas externos
-• Chatbots inteligentes (con audio y voz)
-• Modelado y render 3D para web
-
-# CONSULTORÍA - SERVICIOS
-• Automatización de procesos empresariales (BPA)
-• Automatización robótica (RPA)
-• Integración de sistemas
-• Desarrollo de flujos de trabajo
-• Chatbots y asistentes virtuales
-• Gestión empresarial y digitalización
-• Modelos de negocio digitales
-• Consultoría en innovación y escalamiento
-
-# DETALLES TÉCNICOS - AUTOMATIZACIÓN
-• BPA: Transformamos operaciones completas, desde entrada de datos hasta informes.
-• RPA: Robots de software que realizan tareas repetitivas a alta velocidad.
-• Integración: Conectamos aplicaciones eliminando silos de información.
-• Flujos de Trabajo: Secuencias optimizadas con aprobaciones automáticas.
-• Beneficios: 40% reducción de costos operativos, eliminación de errores.
-
-# DETALLES TÉCNICOS - DISEÑO Y DESARROLLO
-• UI/UX: Diseño centrado en usuario, wireframes, prototipos interactivos
-• Desarrollo: React, Next.js, Tailwind, Node.js, Laravel, WordPress
-• Apps: React Native, PWA, integración con APIs
-• Chatbots: NLP, integración WhatsApp, voz, IA generativa
-• 3D: Three.js, modelado, animación, visualización
-# SIMULACIONES DE CONVERSACIÓN
-
-# SIMULACIÓN 1 - Desarrollo de E-commerce para Tienda de Ropa
-Usuario: "¡Hola! Hablo con alguien de ANTARES, necesito ayuda con una página web para mi tienda de ropa."
-EVA: "¡Hola! Soy EVA, encantada. Claro que podemos ayudarle. Cuénteme, ¿ya tiene algún sitio web o empezarían desde cero?"
-Usuario: "Desde cero, no sé nada de tecnología."
-EVA: "No hay problema, nosotros lo guiamos. ¿Qué funcionalidades le gustaría tener? Por ejemplo: catálogo, carrito de compras…"
-Usuario: "Sí, eso, y que sea fácil de usar."
-EVA: "Perfecto. ¿Tiene fotos profesionales de sus productos?"
-Usuario: "No, solo las tomo yo."
-EVA: "Podemos incluir un paquete de fotografía. ¿Cuántos productos quiere mostrar?"
-Usuario: "Unos 50."
-EVA: "Entiendo. Para darle una solución exacta, ¿le parece si coordinamos una reunión con nuestro equipo de desarrollo? Así definimos plazos y costos."
-Usuario: "Sí, ¿cuándo están disponibles?"
-EVA: "Mañana a las 3 PM. ¿Le envío el link de Zoom?"
-
-# SIMULACIÓN 2 - Campaña de Redes Sociales para Restaurante
-Usuario: "Hola, ¿es ANTARES? Quiero promocionar mi restaurante en redes sociales."
-EVA: "¡Hola! Soy EVA, claro que sí. ¿Actualmente maneja sus redes o las tiene inactivas?"
-Usuario: "Las tengo, pero no generan ventas."
-EVA: "Entiendo. ¿Qué tipo de contenido publica? ¿Fotos, videos, promociones?"
-Usuario: "Solo fotos del menú."
-EVA: "Podríamos crear videos cortos y anuncios segmentados. ¿Tiene un presupuesto mensual para publicidad?"
-Usuario: "Unos $500 USD."
-EVA: "Excelente. Con eso podemos lograr buen alcance. ¿Quiere incluir influencers locales?"
-Usuario: "No lo había pensado… ¿Funciona?"
-EVA: "Sí, aumenta la confianza. Le enviaré casos de éxito. Para personalizar su estrategia, ¿le parece una reunión con nuestro experto en marketing digital?"
-Usuario: "¡Sí!"
-EVA: "¿Disponible el jueves a las 11 AM?"
-
-# SIMULACIÓN 4 - Desarrollo de E-commerce para Artesanías
-Usuario: "Hola, ¿es ANTARES? Quiero vender mis artesanías en línea."
-EVA: "¡Hola! Soy EVA. Claro que podemos ayudarle. ¿Ya tiene algún sitio web o empezaría desde cero?"
-Usuario: "Desde cero, no sé nada de tecnología."
-EVA: "No hay problema. ¿Qué funcionalidades le gustaría? Por ejemplo: catálogo, carrito de compras, pasarela de pagos..."
-Usuario: "Todo eso, y que sea fácil de manejar."
-EVA: "Perfecto. ¿Tiene fotos profesionales de sus productos?"
-Usuario: "No, solo las tomo con mi celular."
-EVA: "Podemos incluir un paquete de fotografía. ¿Cuántos productos quiere mostrar inicialmente?"
-Usuario: "Unos 30."
-EVA: "Entendido. Para ajustar detalles, ¿le parece una reunión con nuestro equipo de desarrollo? Podemos hacerlo mañana a las 10 AM."
-
-# SIMULACIÓN 5 - App Móvil para Gimnasio
-Usuario: "¿Hacen apps para reservar clases de gimnasio?"
-EVA: "¡Hola! Soy EVA. Sí, desarrollamos apps personalizadas. Actualmente, ¿cómo manejan las reservas?"
-Usuario: "Por WhatsApp y es un desorden."
-EVA: "Entiendo. Nuestra app incluiría perfil de usuario, calendario y notificaciones. ¿Quiere integrar pagos en línea?"
-Usuario: "Sí, pero que sea seguro."
-EVA: "Usamos Stripe y PayPal. ¿Tiene preferencia de plataforma: iOS, Android o ambas?"
-Usuario: "Ambas, pero con bajo costo."
-EVA: "Trabajamos con tecnología híbrida para reducir costos. ¿Cuántos usuarios activos tiene?"
-Usuario: "Unos 150."
-EVA: "Perfecto. ¿Le gustaría una demo de una app similar? Puedo coordinarla para el jueves."
-
-# SIMULACIÓN 7 - Marketing Digital para Restaurante
-Usuario: "¿Hacen publicidad para restaurantes?"
-EVA: "¡Hola! Soy EVA. Sí, nos especializamos en gastronomía. ¿Qué redes sociales usa actualmente?"
-Usuario: "Instagram, pero no genero ventas."
-EVA: "¿Publica stories con promociones o solo fotos del menú?"
-Usuario: "Solo fotos... no tengo tiempo."
-EVA: "Crearemos contenido diario y anuncios segmentados. ¿A qué público quiere llegar?"
-Usuario: "Familias y jóvenes adultos."
-EVA: "¿Tiene un presupuesto mensual para publicidad?"
-Usuario: "Unos $500 USD."
-EVA: "Con eso lograremos buen alcance. ¿Comenzamos el lunes con una estrategia inicial?"
-
-
-# INFORMACIÓN COMERCIAL
-• Automatización: Proyectos desde $5,000 USD según alcance
-• Diseño web: Desde $3,000 USD con CMS incluido
-• Apps: Desde $8,000 USD por plataforma
-• Chatbots: Desde $3,000 USD con integraciones básicas
-• Consultoría: $150 USD/hora o proyectos desde $10,000 USD
-
-# CONTACTO
-Tel: +52 (689) 331 2690
-Email: contacto@antaresinnovate.com
-    """,
-    
-    "google_credentials_file": "credentials.json",
-    "google_token_file": "token.json",
-    "google_scopes": [
-        "https://www.googleapis.com/auth/calendar",
-        "https://www.googleapis.com/auth/gmail.send"
-    ],
-    "company_email": "contacto@antaresinnovate.com",
-    "calendar_id": "primary",
-    
-    # Nuevo: timezone para reuniones
-    "timezone": "America/Mexico_City",
-    
-    # Nuevo: plantillas de correo para reuniones
-    "email_templates": {
-        "meeting_confirmation": {
-            "subject": "¡Reunión confirmada con Antares Innovate!",
-            "body_html": """
-            <html>
-            <head>
-                <style>
-                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                    .container { max-width: 600px; margin: 0 auto; }
-                    .header { background-color: #003366; padding: 20px; text-align: center; color: white; }
-                    .content { padding: 20px; background-color: #ffffff; }
-                    .footer { background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 12px; }
-                    .button { display: inline-block; background-color: #FF6600; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>Reunión Confirmada</h1>
-                    </div>
-                    <div class="content">
-                        <h2>¡Hola {{nombre}}!</h2>
-                        
-                        <p>Tu reunión con Antares Innovate ha sido confirmada para:</p>
-                        
-                        <p><strong>Fecha:</strong> {{fecha}}<br>
-                        <strong>Hora:</strong> {{hora}} ({{timezone}})<br>
-                        <strong>Duración:</strong> {{duracion}} minutos</p>
-                        
-                        <p>Podrás unirte a través del siguiente enlace de Google Meet:</p>
-                        
-                        <p style="text-align: center;">
-                            <a href="{{meet_link}}" class="button">Unirse a la reunión</a>
-                        </p>
-                        
-                        <p>Si no puedes asistir, por favor contáctanos con anticipación para reprogramar.</p>
-                        
-                        <p>¡Esperamos verte pronto!</p>
-                        
-                        <p>El equipo de Antares Innovate</p>
-                    </div>
-                    <div class="footer">
-                        <p>Antares Innovate | contacto@antaresinnovate.com | +52 (55) 1234-5678</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """
-        }
-    }
-}
+# Aquí podrías luego utilizar get_response_template(intencion) para obtener una respuesta base
+# o get_lienzo_tecnico("creatividad", "contenido_rrss") si se detecta intención y subtema
 
 # Utilidades para simular escritura humana
 def simulate_thinking(message_length=None):
@@ -1161,6 +936,7 @@ class SentimentAnalyzer:
             "questions": question_count,
             "exclamations": exclamation_count
         }
+    
 
 class EvaAssistant:
     """Asistente virtual Eva para Antares Innovate usando Llama3 vía Ollama."""
@@ -2204,124 +1980,30 @@ class EvaAssistant:
     
     def _build_prompt(self, message: str, intent: str, pillar: str, level: int) -> str:
         """
-        Construye el prompt para Llama3 adaptando la respuesta según el nivel
-        de jerarquía informativa y la intención detectada.
+        Construye el prompt para Llama3 usando la función centralizada de knowledge_fragments.
         """
-        # Analizar el historial de conversación
+         # Analizar el historial de conversación
         conversation_metadata = self._analyze_conversation_complexity()
-        
-        # Determinar límite de longitud basado en complejidad
-        max_length = CONFIG["short_response_length"]  # Por defecto respuestas cortas
-        
-        # Ajustar longitud según complejidad y nivel jerárquico
-        if level >= 4 or conversation_metadata["technical_level"] >= 3:
-            # Para preguntas técnicas o específicas, permitir respuestas más largas
-            max_length = CONFIG["max_response_length"]
-        
-        # Base del prompt con el sistema y rol
-        prompt = f"""<|system|>
-Soy Eva, asistente virtual de Antares Innovate. Mi objetivo es proporcionar respuestas útiles, cálidas y relevantes, 
-adaptando mi nivel de detalle según la complejidad de la pregunta.
-
-INSTRUCCIONES IMPORTANTES:
-1. NUNCA repitas saludos o presentaciones después de la primera interacción
-2. Si ya has saludado o te has presentado en la conversación, NO vuelvas a hacerlo
-3. Mantén un tono cálido, cercano y conversacional pero NO repetitivo
-4. Para preguntas técnicas: proporciona detalles completos y sustanciales
-5. Llama al usuario por su nombre cuando lo conozcas ({self.user_info['nombre'] or ''})
-6. Sigue la conversación de manera natural, sin reiniciar temas ya introducidos
-7. Cuando se pida más información, profundiza con detalles específicos y ejemplos
-8. Equilibra calidez con contenido valioso - no sacrifiques contenido por ser amigable
-9. UTILIZA LENGUAJE VARIADO - evita repetir las mismas palabras, busca sinónimos
-10. Sé CONCISO y DIRECTO - prioriza información valiosa sobre palabras de relleno
-11. USA UN TONO CÁLIDO Y PERSONAL - habla como una asesora amigable, no como un robot
-
-ESTRUCTURA JERÁRQUICA DEL CONOCIMIENTO:
-- Nivel 1: Identidad de marca (quiénes somos, propósito)
-- Nivel 2: Pilares (Creatividad, Tecnología, Consultoría)
-- Nivel 3: Servicios por pilar (listado de servicios)
-- Nivel 4: Detalles por servicio (técnicas, tecnologías)
-- Nivel 5: Información técnica/comercial (tiempos, precios)
-
-EXPRESIONES CÁLIDAS (usa estas o similares):
-"""
-        # Añadir lista de expresiones cálidas para variar el tono
-        random_warm_expressions = random.sample(CONFIG["warm_expressions"], min(5, len(CONFIG["warm_expressions"])))
-        prompt += "\n" + "\n".join([f"- {expr}" for expr in random_warm_expressions])
-
-        prompt += f"""
-
-BASE DE CONOCIMIENTO:
-{CONFIG["knowledge_base_content"]}
-CONTEXTO DE CONVERSACIÓN:
-- Nivel técnico detectado: {conversation_metadata["technical_level"]}/5
-- Profundidad de conversación: {conversation_metadata["conversation_depth"]}/5
-- Sentimiento del usuario: {self.user_info["sentimiento"]}
-- Temas ya mencionados: {', '.join(conversation_metadata["mentioned_topics"]) if conversation_metadata["mentioned_topics"] else "ninguno"}
-"""
-        # Añadir instrucciones específicas según la intención y el pilar
-        if intent == "greeting":
-            prompt += "INSTRUCCIÓN: Saluda de forma cálida y personal. Mantén la respuesta breve, amigable y acogedora.\n"
-        
-        elif intent == "identity":
-            if level <= 2:
-                prompt += "INSTRUCCIÓN: Explica brevemente quiénes somos. Presenta los tres pilares de forma concisa y atractiva.\n"
-            else:
-                prompt += "INSTRUCCIÓN: Explica nuestra identidad con más detalle, describiendo cómo nuestros pilares trabajan juntos de manera sinérgica.\n"
-        
-        elif intent in ["creativity", "technology", "consulting"]:
-            if level <= 2:
-                prompt += f"INSTRUCCIÓN: Presenta el pilar de {intent} de forma concisa y atractiva. No entres en detalles técnicos, enfócate en beneficios.\n"
-            elif level == 3:
-                prompt += f"INSTRUCCIÓN: Explica los principales servicios de {intent} con ejemplos relevantes pero sin saturar de información.\n"
-            else:
-                prompt += f"INSTRUCCIÓN: Proporciona información técnica sobre {intent} incluyendo tecnologías y metodologías que utilizamos.\n"
-        
-        elif intent == "pricing":
-            prompt += "INSTRUCCIÓN: Habla de rangos de precio sin cifras exactas. Enfatiza el valor de nuestra inversión sobre los costos. Evita abrumar con números.\n"
-        
-        elif intent == "meeting":
-            prompt += "INSTRUCCIÓN: Facilita el proceso de agendar una reunión con tono entusiasta pero profesional. Sé clara y directa.\n"
-        
-        # Si ya ha saludado, añadir instrucción para no volver a saludar
-        if conversation_metadata.get("has_greeted", False):
-            prompt += "\nNO VUELVAS A SALUDAR. Ya has saludado anteriormente en esta conversación.\n"
-            
-        # Si ya se ha presentado, añadir instrucción para no volver a presentarse
-        if conversation_metadata.get("has_introduced", False):
-            prompt += "\nNO VUELVAS A PRESENTARTE. Ya te has presentado anteriormente.\n"
-        
-        # Instrucciones para evitar repeticiones
-        if conversation_metadata["repeated_phrases"]:
-            prompt += "\nEVITA REPETIR ESTAS IDEAS:\n"
-            for phrase in conversation_metadata["repeated_phrases"]:
-                prompt += f"- {phrase}\n"
-        
-        # Instrucciones para mejorar calidad y variedad en la respuesta
-        prompt += f"""
-INSTRUCCIONES DE ESTILO Y CALIDAD:
-1. Limita tu respuesta a {max_length} caracteres máximo
-2. Utiliza lenguaje variado y evita repetir las mismas palabras (especialmente "automatización", "marketing", "digital")
-3. Usa un tono CONVERSACIONAL y CÁLIDO, como si hablaras con un amigo
-4. Evita frases cliché como "en Antares" o "para tu negocio" repetidamente
-5. PERSONALIZA la respuesta según la emoción detectada del usuario ({self.user_info["sentimiento"]})
-"""
-        
-        # Añadir historial de conversación reciente (últimos 4 mensajes para mantener contexto)
-        if len(self.conversation_history) > 0:
-            recent_history = self.conversation_history[-min(4, len(self.conversation_history)):]
-            prompt += "\nCONVERSACIÓN RECIENTE:\n"
-            for msg in recent_history:
-                if msg["rol"] == "usuario":
-                    prompt += f"Usuario: {msg['contenido']}\n"
-                else:
-                    prompt += f"Eva: {msg['contenido']}\n"
-        
-        # Añadir mensaje actual y finalizar prompt
-        prompt += f"<|/system|>\n\n<|user|>\n{message}\n<|/user|>\n\n<|assistant|>"
-        
+    
+    # Preparar contexto adicional para el prompt
+        context_info = {
+        "technical_level": conversation_metadata["technical_level"],
+        "conversation_depth": conversation_metadata["conversation_depth"],
+        "sentiment": self.user_info["sentimiento"],
+        "mentioned_topics": conversation_metadata["mentioned_topics"],
+        "user_name": self.user_info["nombre"],
+        "repeated_phrases": conversation_metadata["repeated_phrases"],
+        "has_greeted": conversation_metadata.get("has_greeted", False),
+        "has_introduced": conversation_metadata.get("has_introduced", False)
+        }
+    
+         # Obtener el prompt optimizado desde knowledge_fragments
+        prompt = get_filtered_prompt(message, intent, level, 
+                                context=context_info, 
+                                conversation_history=self.conversation_history[-min(4, len(self.conversation_history)):])
+    
         return prompt
-
+    
     def _optimize_response(self, response: str, max_length: int, is_technical: bool = False) -> str:
         """
         Optimiza la respuesta manteniendo su valor y tono amigable.
@@ -2464,131 +2146,116 @@ INSTRUCCIONES DE ESTILO Y CALIDAD:
         """Genera una respuesta al mensaje del usuario."""
         if CONFIG["debug"]:
             print(f"\n{Colors.BLUE}[Procesando] Mensaje: '{message}'{Colors.ENDC}")
-        
+    
         self.message_counter += 1
         intent, pillar, level = self._classify_intent_and_level(message)
-        
+    
         if CONFIG["debug"]:
             print(f"{Colors.BLUE}[Procesando] Intención: {intent}, Pilar: {pillar}, Nivel: {level}{Colors.ENDC}")
-        
-        # Extraer información del usuario del mensaje
+    
+    # Extraer información del usuario del mensaje
         self._extract_user_info(message)
-        
-        # Guardar el mensaje en el historial
+    
+    # Guardar el mensaje en el historial
         self.conversation_history.append({
-            "id": self.message_counter,
-            "rol": "usuario", 
-            "contenido": message,
-            "timestamp": datetime.now().isoformat(),
-            "intencion": intent
+        "id": self.message_counter,
+        "rol": "usuario", 
+        "contenido": message,
+        "timestamp": datetime.now().isoformat(),
+        "intencion": intent
         })
-        
-        # Simular tiempo de pensamiento
+    
+    # Simular tiempo de pensamiento
         simulate_thinking(len(message))
-        
-        # Manejar solicitudes de reunión si se detecta esa intención
+    
+    # Manejar solicitudes de reunión si se detecta esa intención
         if intent == "meeting":
             meeting_response, meeting_processed = self._handle_meeting_request(message)
-            
-            # Si se procesó correctamente la reunión, devolver la respuesta
+        
+        # Si se procesó correctamente la reunión, devolver la respuesta
             if meeting_processed or "reunión" in meeting_response.lower():
-                # Guardar la respuesta en el historial
+            # Guardar la respuesta en el historial
                 self.conversation_history.append({
-                    "id": self.message_counter,
-                    "rol": "asistente", 
-                    "contenido": meeting_response,
-                    "timestamp": datetime.now().isoformat(),
-                    "intencion": intent
+                "id": self.message_counter,
+                "rol": "asistente", 
+                "contenido": meeting_response,
+                "timestamp": datetime.now().isoformat(),
+                "intencion": intent
                 })
-                
-                # Mostrar respuesta
-                if self.typing_simulation:
-                    simulate_typing(meeting_response)
-                else:
-                    print(f"\n{Colors.GREEN}Eva:{Colors.ENDC} {meeting_response}")
-                
-                return meeting_response
-        
-        # Construir el prompt para Llama3
+            
+            # Mostrar respuesta
+            if self.typing_simulation:
+                simulate_typing(meeting_response)
+            else:
+                print(f"\n{Colors.GREEN}Eva:{Colors.ENDC} {meeting_response}")
+            
+            return meeting_response
+    
+    # Construir el prompt para Llama3
         prompt = self._build_prompt(message, intent, pillar, level)
-        
-        # Generar respuesta con Llama3
+    
+    # Generar respuesta con Llama3
         llama_response = self.ollama_client.generate_response(prompt)
-        
-        # Si la respuesta de Llama3 está vacía o es demasiado corta, usar respuesta de fallback
+    
+    # Si la respuesta de Llama3 está vacía o es demasiado corta, usar respuesta de fallback
         if not llama_response or len(llama_response) < 20:
             if CONFIG["debug"]:
                 print(f"{Colors.YELLOW}[Advertencia] Respuesta de Llama3 vacía o muy corta, usando fallback{Colors.ENDC}")
-            
-            # Generar una respuesta simple basada en la intención
-            fallback_responses = {
-                "greeting": "¡Hola! Soy Eva de Antares Innovate. ¿En qué puedo ayudarte hoy?",
-                "farewell": "¡Ha sido un placer ayudarte! Si necesitas más información, estamos a tus órdenes. ¡Que tengas un excelente día!",
-                "identity": "Somos Antares Innovate, una agencia de transformación digital que combina creatividad, tecnología y consultoría para ayudar a empresas a escalar en el mundo digital.",
-                "creativity": "Nuestro pilar de Creatividad incluye servicios de branding, diseño visual, motion graphics, ilustraciones y generación de contenido. ¿Te gustaría conocer más sobre algún servicio específico?",
-                "technology": "En el área de Tecnología ofrecemos desarrollo web, apps, chatbots, y diseño UI/UX con tecnologías de vanguardia. ¿Sobre qué servicio te gustaría más información?",
-                "consulting": "Nuestra área de Consultoría incluye automatización de procesos, transformación digital, gestión empresarial y estrategias de innovación. ¿En qué podemos ayudarte?",
-                "pricing": "Nuestros precios varían según el proyecto: automatización desde $5,000 USD, diseño web desde $3,000 USD, y consultoría desde $150 USD/hora. ¿Te gustaría una cotización personalizada?",
-                "contact": "Puedes contactarnos en contacto@antaresinnovate.com o al +52 (55) 1234-5678. ¿Prefieres que te contactemos nosotros?",
-                "default": "En Antares Innovate combinamos creatividad, tecnología y consultoría para transformar negocios digitalmente. ¿Sobre qué área te gustaría conocer más?"
-            }
-            
-            # Añadir expresión cálida aleatoria
-            warm_expression = random.choice(CONFIG["warm_expressions"])
-            
-            # Seleccionar respuesta base
-            base_response = fallback_responses.get(intent, fallback_responses["default"])
-            
-            # Personalizar con nombre si lo tenemos
+        
+        # Obtener template de respuesta según intención
+            response_template = get_response_template(intent, level)
+        
+        # Personalizar con nombre si lo tenemos
             if self.user_info["nombre"]:
-                if "hola" in base_response.lower() or "buen" in base_response.lower():
-                    # Para saludos, insertar el nombre después del saludo
-                    base_response = re.sub(r'(¡Como estas!)', f"\\1 {self.user_info['nombre']},", base_response, flags=re.IGNORECASE)
+                if "hola" in response_template.lower() or "buen" in response_template.lower():
+                # Para saludos, insertar el nombre después del saludo
+                    response_template = re.sub(r'(¡Como estas!)', f"\\1 {self.user_info['nombre']},", response_template, flags=re.IGNORECASE)
                 else:
-                    # Para otras respuestas, añadir al inicio
+                # Para otras respuestas, añadir al inicio
+                    warm_expression = random.choice(CONFIG["warm_expressions"])
                     prefix = f"{warm_expression} {self.user_info['nombre']}, "
-                    base_response = prefix + base_response[0].lower() + base_response[1:]
-            
-            response = base_response
-            
-            # Añadir información de contacto si no hay ya
+                    response_template = prefix + response_template[0].lower() + response_template[1:]
+        
+            response = response_template
+        
+        # Añadir información de contacto si no hay ya
             if "contacto@antaresinnovate.com" not in response and "www.antaresinnovate.com" not in response:
                 response += random.choice(CONTACT_INFO)
-        else:
-            # Determinar si es una consulta técnica que requiere respuesta detallada
-            is_technical = level >= 4 or intent in ["consulting", "technology", "creativity"] and level >= 3
-            
-            # Longitud máxima según complejidad
+            else:
+        # Determinar si es una consulta técnica que requiere respuesta detallada
+                is_technical = level >= 4 or intent in ["consulting", "technology", "creativity"] and level >= 3
+        
+        # Longitud máxima según complejidad
             max_length = CONFIG["max_response_length"] if is_technical else CONFIG["short_response_length"]
-            
-            # Optimizar la respuesta de Llama3
+        
+        # Optimizar la respuesta de Llama3
             response = self._optimize_response(llama_response, max_length, is_technical)
-            
-            # Añadir información de contacto para intenciones específicas
+        
+        # Añadir información de contacto para intenciones específicas
             if intent in ["pricing", "meeting", "contact"] and "contacto@antaresinnovate.com" not in response:
-                # Añadir contacto solo si hay espacio
+            # Añadir contacto solo si hay espacio
                 if len(response) + 30 <= max_length:
                     contact_info = "\n\nContacto: contacto@antaresinnovate.com"
                     response += contact_info
-        
-        # Guardar la respuesta en el historial
+    
+    # Guardar la respuesta en el historial
         self.conversation_history.append({
-            "id": self.message_counter,
-            "rol": "asistente", 
-            "contenido": response,
-            "timestamp": datetime.now().isoformat(),
-            "intencion": intent
-        })
-        
+        "id": self.message_counter,
+        "rol": "asistente", 
+        "contenido": response,
+        "timestamp": datetime.now().isoformat(),
+        "intencion": intent
+    })
+    
         if CONFIG["debug"]:
             print(f"{Colors.GREEN}[Procesando] Respuesta lista ({len(response)} caracteres){Colors.ENDC}")
-        
-        # Mostrar la respuesta al usuario
+    
+    # Mostrar la respuesta al usuario
         if self.typing_simulation:
             simulate_typing(response)
         else:
             print(f"\n{Colors.GREEN}Eva:{Colors.ENDC} {response}")
-            
+        
         return response
     
     def save_conversation(self, filename: str = "conversacion_eva.json"):
