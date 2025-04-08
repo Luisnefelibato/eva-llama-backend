@@ -32,7 +32,7 @@ THINKING_MESSAGES = [
 # Configuración de Ollama
 DEBUG = True
 OLLAMA_MODEL = "llama3"
-OLLAMA_API_URL = "https://shaggy-bats-help.loca.lt/api/generate"
+OLLAMA_API_URL = "https://evaollama.loca.lt/api/generate"
 
 # Límites de longitud para respuestas
 MAX_RESPONSE_LENGTH = 600  # Límite para respuestas técnicas
