@@ -1998,9 +1998,14 @@ class EvaAssistant:
         }
     
          # Obtener el prompt optimizado desde knowledge_fragments
-        prompt = get_filtered_prompt(message, intent, level, 
-                                context=context_info, 
-                                conversation_history=self.conversation_history[-min(4, len(self.conversation_history)):])
+        # Opcional: armar texto de contexto combinando variables que antes pasabas por separado
+        extra_context = context_info  # Podés incluir aquí más info si querés
+
+        prompt = get_filtered_prompt(
+        message, intent, nivel=level, 
+        contexto_extra=extra_context
+)
+
     
         return prompt
     

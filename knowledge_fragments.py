@@ -520,22 +520,23 @@ def get_lienzo_tecnico(area, servicio=None):
         
     return result
 
-def get_filtered_prompt(message, intent, nivel=1, max_chars=7000):
+def get_filtered_prompt(message, intent, nivel=1, max_chars=7000, contexto_extra=None):
     """
     Construye un prompt optimizado para Llama3 evitando superar el límite de tokens.
-    
+
     Args:
         message: mensaje del usuario
         intent: intención detectada 
         nivel: nivel de profundidad técnica (1-5)
         max_chars: límite máximo de caracteres
-        
+        contexto_extra: texto opcional para añadir instrucciones o contexto
+
     Returns:
         prompt optimizado para Llama3
     """
     # Obtener fragmentos relevantes para la intención
     knowledge = get_fragment_by_intent(intent, nivel)
-    
+
     # Base del prompt con sistema y rol
     system_prompt = f"""<|system|>
 Soy Eva, asistente virtual de Antares Innovate. Mi objetivo es proporcionar respuestas útiles, cálidas y relevantes, 
@@ -555,31 +556,37 @@ EXPRESIONES CÁLIDAS (usa estas o similares):
 - Cuenta conmigo para cualquier duda
 
 BASE DE CONOCIMIENTO:
-{knowledge}
-<|/system|>\n\n<|user|>\n{message}\n<|/user|>\n\n<|assistant|>"""
-    
+{knowledge}"""
+
+    # Añadir contexto extra si existe
+    if contexto_extra:
+        system_prompt += f"\n\n[NOTA PARA EVA: {contexto_extra}]"
+
+    system_prompt += f"<|/system|>\n\n<|user|>\n{message}\n<|/user|>\n\n<|assistant|>"
+
     # Verificar si excede el límite
     if len(system_prompt) > max_chars:
         # Reducir el conocimiento manteniendo las partes más relevantes
         base_prompt = system_prompt.replace(knowledge, "")
         available_chars = max_chars - len(base_prompt)
-        
+
         # Priorizar fragmentos según relevancia
         knowledge_chunks = knowledge.split("\n\n")
         prioritized_knowledge = []
-        
+
         # Usar solo los fragmentos más relevantes que quepan
         current_length = 0
         for chunk in knowledge_chunks:
             if current_length + len(chunk) <= available_chars:
                 prioritized_knowledge.append(chunk)
                 current_length += len(chunk) + 2  # +2 por los saltos de línea
-        
+
         # Reconstruir el prompt con los fragmentos que caben
         reduced_knowledge = "\n\n".join(prioritized_knowledge)
         system_prompt = system_prompt.replace(knowledge, reduced_knowledge)
-    
+
     return system_prompt
+
 
 def get_response_template(intent, nivel=1):
     """
