@@ -2168,7 +2168,7 @@ class EvaAssistant:
         "contenido": message,
         "timestamp": datetime.now().isoformat(),
         "intencion": intent
-        })
+    })
 
     # Simular tiempo de pensamiento
         simulate_thinking(len(message))
@@ -2184,14 +2184,14 @@ class EvaAssistant:
                 "contenido": meeting_response,
                 "timestamp": datetime.now().isoformat(),
                 "intencion": intent
-            })
+                })
 
-            if self.typing_simulation:
-                simulate_typing(meeting_response)
-            else:
-                print(f"\n{Colors.GREEN}Eva:{Colors.ENDC} {meeting_response}")
+                if self.typing_simulation:
+                    simulate_typing(meeting_response)
+                else:
+                    print(f"\n{Colors.GREEN}Eva:{Colors.ENDC} {meeting_response}")
 
-            return meeting_response
+                return meeting_response
 
     # Definir is_technical antes del llamado a Ollama
         is_technical = level >= 4 or (intent in ["consulting", "technology", "creativity"] and level >= 3)
@@ -2206,24 +2206,30 @@ class EvaAssistant:
             if CONFIG["debug"]:
                 print(f"{Colors.YELLOW}[Advertencia] Respuesta de Llama3 vacía o muy corta, usando fallback{Colors.ENDC}")
 
-            fallback_response = get_response_template(intent, nivel=level)
+        fallback_response = get_response_template(intent, nivel=level)
 
-            if self.user_info["nombre"]:
-                warm_expression = random.choice(CONFIG["warm_expressions"])
-                fallback_response = f"{warm_expression} {self.user_info['nombre']}, {fallback_response}"
+        if self.user_info["nombre"]:
+            warm_expression = random.choice(CONFIG["warm_expressions"])
+            fallback_response = f"{warm_expression} {self.user_info['nombre']}, {fallback_response}"
 
+        if not fallback_response:
+            response = "Lo siento, no pude generar una respuesta adecuada. ¿Podrías reformular tu pregunta?"
+        else:
             response = fallback_response
 
-            if intent in ["pricing", "meeting", "contact"] and "contacto@antaresinnovate.com" not in response:
-                if len(response) + 30 <= CONFIG["short_response_length"]:
-                    response += "\n\nContacto: contacto@antaresinnovate.com"
-            else:
-                max_length = CONFIG["max_response_length"] if is_technical else CONFIG["short_response_length"]
-                response = self._optimize_response(llama_response, max_length, is_technical)
+        if intent in ["pricing", "meeting", "contact"] and "contacto@antaresinnovate.com" not in response:
+            if len(response) + 30 <= CONFIG["short_response_length"]:
+                response += "\n\nContacto: contacto@antaresinnovate.com"
+        else:
+            max_length = CONFIG["max_response_length"] if is_technical else CONFIG["short_response_length"]
+            response = self._optimize_response(llama_response, max_length, is_technical)
 
-                if intent in ["pricing", "meeting", "contact"] and "contacto@antaresinnovate.com" not in response:
-                    if len(response) + 30 <= CONFIG["short_response_length"]:
-                        response += "\n\nContacto: contacto@antaresinnovate.com"
+        if intent in ["pricing", "meeting", "contact"] and "contacto@antaresinnovate.com" not in response:
+            if len(response) + 30 <= CONFIG["short_response_length"]:
+                response += "\n\nContacto: contacto@antaresinnovate.com"
+
+        if not 'response' in locals():
+            response = "Lo siento, algo salió mal al procesar tu mensaje. ¿Podrías repetirlo?"
 
         self.conversation_history.append({
         "id": self.message_counter,
@@ -2231,7 +2237,7 @@ class EvaAssistant:
         "contenido": response,
         "timestamp": datetime.now().isoformat(),
         "intencion": intent
-        })
+    })
 
         if CONFIG["debug"]:
             print(f"{Colors.GREEN}[Procesando] Respuesta lista ({len(response)} caracteres){Colors.ENDC}")
@@ -2242,6 +2248,7 @@ class EvaAssistant:
             print(f"\n{Colors.GREEN}Eva:{Colors.ENDC} {response}")
 
         return response
+
 
     def save_conversation(self, filename: str = "conversacion_eva.json"):
         """Guarda la conversación actual en un archivo JSON."""
