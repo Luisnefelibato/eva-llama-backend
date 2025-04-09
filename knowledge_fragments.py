@@ -473,7 +473,6 @@ SIMULACIONES = {
     }
 }
 
-
 # =============================================================================
 # FUNCIONES DE UTILIDAD - Para acceder y filtrar el conocimiento
 # =============================================================================
@@ -610,9 +609,9 @@ EXPRESIONES CÁLIDAS (usa estas o similares):
 
 BASE DE CONOCIMIENTO:
 {knowledge}
-    <|/system|>\n\n<|user|>\n{message}\n<|/user|>\n\n<|assistant|>"""
+<|/system|>\n\n<|user|>\n{message}\n<|/user|>\n\n<|assistant|>"""
 
-    
+
     
     # Verificar si excede el límite
     if len(system_prompt) > max_chars:
