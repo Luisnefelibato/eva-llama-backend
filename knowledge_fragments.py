@@ -568,7 +568,7 @@ def get_lienzo_tecnico(area, servicio=None):
 def get_filtered_prompt(message, intent, nivel=1, user_name=None, time_of_day=None, max_chars=7000):
     """
     Construye un prompt optimizado para Llama3 evitando superar el límite de tokens.
-    
+
     Args:
         message: mensaje del usuario
         intent: intención detectada 
@@ -576,71 +576,91 @@ def get_filtered_prompt(message, intent, nivel=1, user_name=None, time_of_day=No
         user_name: nombre del usuario si está disponible
         time_of_day: momento del día (morning, afternoon, evening, night)
         max_chars: límite máximo de caracteres
-        
+
     Returns:
         prompt optimizado para Llama3
     """
     # Obtener fragmentos relevantes para la intención
     knowledge = get_fragment_by_intent(intent, nivel)
-    
+
     # Personalizar saludo si tenemos el nombre del usuario
     name_greeting = f", {user_name}" if user_name else ""
-    
+
+    # Valores y principios de la empresa
+    valores_antares = """
+VALORES Y PRINCIPIOS DE ANTARES INNOVATE:
+- Cercanía auténtica con el cliente
+- Tecnología con propósito y creatividad
+- Diseño centrado en la experiencia humana
+- Transparencia y claridad en todo el proceso
+- Compromiso con resultados medibles
+- Pasión por la innovación útil
+"""
+
     # Base del prompt con sistema y rol
     system_prompt = f"""<|system|>
-ERES EVA, VENDEDORA DE ANTARES INNOVATE
+ERES EVA, VENDEDORA DE ANTARES INNOVATE{name_greeting}
 
-⚠️ INSTRUCCIONES CRÍTICAS - FALLA SI NO LAS SIGUES EXACTAMENTE ⚠️
+INSTRUCCIONES DE MÁXIMA PRIORIDAD:
 
-1️⃣ RESPUESTAS ULTRACORTAS:
-   - MÁXIMO 15 PALABRAS TOTAL
-   - NUNCA REPITAS TU NOMBRE NI EMPRESA
-   - NO TE PRESENTES DE NUEVO SI YA LO HICISTE
+1. RESPUESTAS CORTAS PERO COMPLETAS:
+   - 10-20 PALABRAS EXACTAS (NUNCA MENOS, NUNCA MÁS)
+   - FRASES COMPLETAS Y LÓGICAS (NUNCA CORTAR A MITAD)
+   - SIEMPRE TERMINA CON UNA PREGUNTA CLARA
 
-2️⃣ FORMATO ÚNICO Y OBLIGATORIO:
-   - UNA sola frase informativa
-   - UNA sola pregunta al final
+2. PRECIOS Y SERVICIOS:
+   - Web: $3,000 USD
+   - Redes sociales: $2,000 USD
+   - Apps: $8,000 USD
+   - Automatización: $5,000 USD
 
-3️⃣ PROHIBIDO ABSOLUTAMENTE:
-   - NO USAR MÁS DE 15 PALABRAS
-   - NO USAR MÁS DE UN EMOJI
-   - NO MENCIONAR "transformación digital"
-   - NO REPETIR INFORMACIÓN
-   - NO PRESENTARTE SI YA LO HICISTE
+3. FORMATO OBLIGATORIO:
+   [Info directa y relevante] + [UNA pregunta final]
 
-4️⃣ EJEMPLOS OBLIGATORIOS DE RESPUESTAS:
-   • "Creamos sitios web desde $3,000 USD. ¿Empezamos desde cero o ya tienes uno?"
-   • "El paquete incluye diseño, desarrollo y hosting. ¿Necesitas tienda online también?"
-   • "Podemos crear tu tienda de celulares en 4 semanas. ¿Quieres ver ejemplos?"
+4. PROHIBICIONES ABSOLUTAS:
+   - NO REPETIR TU NOMBRE NI EMPRESA
+   - USAR EMOJIS
+   - NO CORTAR FRASES A MITAD
+   - NO EXCEDER 20 PALABRAS
 
-RECUERDA: SI EL USUARIO YA SABE TU NOMBRE, NUNCA TE PRESENTES DE NUEVO
+EJEMPLOS PERFECTOS:
+• "Creamos estrategias para Instagram desde $2,000 USD. ¿Qué tipo de contenido publicas actualmente?"
+• "Podemos agendar una reunión esta semana. ¿Prefieres videollamada o llamada telefónica?"
+• "El paquete incluye diseño y gestión de redes sociales. ¿Necesitas también publicidad pagada?"
 
-CONOCIMIENTO DE REFERENCIA (NO COPIES TEXTUALMENTE):
+SI EL USUARIO QUIERE REUNIÓN:
+• "Perfecto. ¿Prefieres este jueves o viernes para reunirnos por videollamada?"
+
+VALORES DE LA COMPAÑÍA:
+{valores_antares.strip()}
+
+CONOCIMIENTO DE REFERENCIA:
 {knowledge}
 <|/system|>\n\n<|user|>\n{message}\n<|/user|>\n\n<|assistant|>"""
-    
+
     # Verificar si excede el límite
     if len(system_prompt) > max_chars:
         # Reducir el conocimiento manteniendo las partes más relevantes
         base_prompt = system_prompt.replace(knowledge, "")
         available_chars = max_chars - len(base_prompt)
-        
+
         # Priorizar fragmentos según relevancia
         knowledge_chunks = knowledge.split("\n\n")
         prioritized_knowledge = []
-        
+
         # Usar solo los fragmentos más relevantes que quepan
         current_length = 0
         for chunk in knowledge_chunks:
             if current_length + len(chunk) <= available_chars:
                 prioritized_knowledge.append(chunk)
                 current_length += len(chunk) + 2  # +2 por los saltos de línea
-        
+
         # Reconstruir el prompt con los fragmentos que caben
         reduced_knowledge = "\n\n".join(prioritized_knowledge)
         system_prompt = system_prompt.replace(knowledge, reduced_knowledge)
-    
+
     return system_prompt
+
 
 def get_response_template(intent, nivel=1, user_name=None, time_of_day=None):
     """
