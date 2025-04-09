@@ -568,7 +568,7 @@ def get_lienzo_tecnico(area, servicio=None):
 def get_filtered_prompt(message, intent, nivel=1, user_name=None, time_of_day=None, max_chars=7000):
     """
     Construye un prompt optimizado para Llama3 evitando superar el límite de tokens.
-
+    
     Args:
         message: mensaje del usuario
         intent: intención detectada 
@@ -576,89 +576,74 @@ def get_filtered_prompt(message, intent, nivel=1, user_name=None, time_of_day=No
         user_name: nombre del usuario si está disponible
         time_of_day: momento del día (morning, afternoon, evening, night)
         max_chars: límite máximo de caracteres
-
+        
     Returns:
         prompt optimizado para Llama3
     """
     # Obtener fragmentos relevantes para la intención
     knowledge = get_fragment_by_intent(intent, nivel)
-
+    
     # Personalizar saludo si tenemos el nombre del usuario
     name_greeting = f", {user_name}" if user_name else ""
-
-    # Valores y principios de la empresa
-    valores_antares = """
-VALORES Y PRINCIPIOS DE ANTARES INNOVATE:
-- Cercanía auténtica con el cliente
-- Tecnología con propósito y creatividad
-- Diseño centrado en la experiencia humana
-- Transparencia y claridad en todo el proceso
-- Compromiso con resultados medibles
-- Pasión por la innovación útil
-"""
-
-    # Base del prompt con sistema y rol
+    
+    # Base del prompt con sistema y rol - VERSION FINAL ULTRA RESTRICTIVA
     system_prompt = f"""<|system|>
-ERES EVA, VENDEDORA DE ANTARES INNOVATE{name_greeting}
+TU ERES EVA, PERO NUNCA TE PRESENTAS MÁS DE UNA VEZ EN LA CONVERSACIÓN.
 
-INSTRUCCIONES DE MÁXIMA PRIORIDAD:
+⚠️ REGLAS ESTRICTAS DE ABSOLUTO CUMPLIMIENTO ⚠️
 
-1. RESPUESTAS CORTAS PERO COMPLETAS:
-   - 10-20 PALABRAS EXACTAS (NUNCA MENOS, NUNCA MÁS)
-   - FRASES COMPLETAS Y LÓGICAS (NUNCA CORTAR A MITAD)
-   - SIEMPRE TERMINA CON UNA PREGUNTA CLARA
+>> PRIMERA REGLA: RESPUESTAS CORTAS
+   - MÁXIMO 12 PALABRAS TOTAL
+   - UNA SOLA FRASE DE INFORMACIÓN
+   - UNA SOLA PREGUNTA AL FINAL
 
-2. PRECIOS Y SERVICIOS:
-   - Web: $3,000 USD
-   - Redes sociales: $2,000 USD
-   - Apps: $8,000 USD
-   - Automatización: $5,000 USD
+>> SEGUNDA REGLA: NO REPETICIÓN
+   - NUNCA TE PRESENTES DOS VECES
+   - NO USAR "SOY EVA DE ANTARES INNOVATE"
+   - NO MENCIONAR "EQUIPO DE ANTARES"
 
-3. FORMATO OBLIGATORIO:
-   [Info directa y relevante] + [UNA pregunta final]
+>> TERCERA REGLA: MANTÉN CONTEXTO
+   - USA LA INFORMACIÓN QUE YA DIO EL USUARIO
+   - PREGUNTA SOBRE DETALLES ESPECÍFICOS
+   - EVITA PREGUNTAS GENERALES REPETITIVAS
 
-4. PROHIBICIONES ABSOLUTAS:
-   - NO REPETIR TU NOMBRE NI EMPRESA
-   - USAR EMOJIS
-   - NO CORTAR FRASES A MITAD
-   - NO EXCEDER 20 PALABRAS
+SERVICIOS Y PRECIOS EXACTOS:
+• Tienda online para vender computadoras: $3,000 USD
+• Campañas en redes sociales: $2,000 USD
+• Mejora de experiencia de usuario: $2,500 USD
 
-EJEMPLOS PERFECTOS:
-• "Creamos estrategias para Instagram desde $2,000 USD. ¿Qué tipo de contenido publicas actualmente?"
-• "Podemos agendar una reunión esta semana. ¿Prefieres videollamada o llamada telefónica?"
-• "El paquete incluye diseño y gestión de redes sociales. ¿Necesitas también publicidad pagada?"
+EJEMPLOS PERFECTOS (IMITA EXACTAMENTE ESTE ESTILO):
+• "Creamos sitios de ecommerce desde $3,000 USD. ¿Tienes web actualmente?"
+• "Nuestras campañas aumentan ventas un 30%. ¿Vendes online o presencial?"
+• "Podemos empezar este mes. ¿Prefieres reunión jueves o viernes?"
 
-SI EL USUARIO QUIERE REUNIÓN:
-• "Perfecto. ¿Prefieres este jueves o viernes para reunirnos por videollamada?"
-
-VALORES DE LA COMPAÑÍA:
-{valores_antares.strip()}
+RECUERDA: CORTO, DIRECTO, SIN REPETICIONES.
 
 CONOCIMIENTO DE REFERENCIA:
 {knowledge}
 <|/system|>\n\n<|user|>\n{message}\n<|/user|>\n\n<|assistant|>"""
-
+    
     # Verificar si excede el límite
     if len(system_prompt) > max_chars:
         # Reducir el conocimiento manteniendo las partes más relevantes
         base_prompt = system_prompt.replace(knowledge, "")
         available_chars = max_chars - len(base_prompt)
-
+        
         # Priorizar fragmentos según relevancia
         knowledge_chunks = knowledge.split("\n\n")
         prioritized_knowledge = []
-
+        
         # Usar solo los fragmentos más relevantes que quepan
         current_length = 0
         for chunk in knowledge_chunks:
             if current_length + len(chunk) <= available_chars:
                 prioritized_knowledge.append(chunk)
                 current_length += len(chunk) + 2  # +2 por los saltos de línea
-
+        
         # Reconstruir el prompt con los fragmentos que caben
         reduced_knowledge = "\n\n".join(prioritized_knowledge)
         system_prompt = system_prompt.replace(knowledge, reduced_knowledge)
-
+    
     return system_prompt
 
 
